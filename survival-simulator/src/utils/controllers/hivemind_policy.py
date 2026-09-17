@@ -102,6 +102,7 @@ class Hivemind:
         self.claims = {}      # agent_id -> ("fruit"|"tree", index)
         self.landmarks = {}   # round(edge length, 4) -> [(ax1, ay1, ax2, ay2), ...]
         self.cell_seen = {}   # (i, j) -> tick a localized agent last stood in that cell
+        self.terrain = {}     # (x//40, y//40) -> biome name, learned from localized agents' own biome
 
     def _mem(self, aid):
         m = self.mem.get(aid)
@@ -137,7 +138,7 @@ class Hivemind:
             m = self._mem(a["agent_id"])
             self._detect_aging(a, m)
             dist, direction, turn = self._plan(a, m, t)
-            spawn = a["agent_id"] in spawners and a["energy"] > 100
+            spawn = a["agent_id"] in spawners and a["energy"] > 100 and not m["mode"].startswith("flee")
             if spawn:
                 dist = 0.0  # stand still while investing
             cost, real = move_cost(a, dist)
@@ -227,6 +228,7 @@ class Hivemind:
             obs = a["observations"]
             edges = [o["coords"] for o in obs if o["type"] == "Edge"]
             self.cell_seen[(int(m["x"] // CELL), int(m["y"] // CELL))] = self.tick
+            self.terrain[(int(m["x"] // 40), int(m["y"] // 40))] = a["biome"]
             hear = a["hearing_radius"] - 8
             # things we should perceive (hearing, or unblocked in the vision cone) but don't are gone
             def perceivable(px, py):
@@ -344,7 +346,7 @@ class Hivemind:
                 w = 1.0 / max(o["distance"], 1.0)
                 fx -= w * math.cos(o["angle"])
                 fy -= w * math.sin(o["angle"])
-            away = math.atan2(fy, fx)
+            away = self._flee_dir(m, math.atan2(fy, fx))
             seen_by_it = p["distance"] < 60 or abs(p["rel_dir"]) < math.pi / 6 + 0.15
             limit = CHARGE_RELEASE if m["sprinting"] else CHARGE_DIST
             m["sprinting"] = seen_by_it and p["distance"] < limit and can_sprint
@@ -354,7 +356,7 @@ class Hivemind:
             return dist, away, p["angle"] - 0.35
         if m["pred"] is not None and self.tick - m["pred_tick"] < FLEE_MEMORY:
             m["mode"] = "flee_mem"
-            return speed, wrap(m["pred"] + math.pi - m["h"]), 0.0
+            return speed, self._flee_dir(m, wrap(m["pred"] + math.pi - m["h"])), 0.0
 
         # 2. eat visible fruit (ignore fruit we only hear through a wall)
         fruits = [f for f in fruits if not self._blocked(f["distance"], f["angle"], edges)]
@@ -465,6 +467,12 @@ class Hivemind:
             m["mode"] = "scan"
             return 0.0, 0.0, a["vision_angle"]
         m["mode"] = "sit"
+        if m["err"] <= LOC_OK and self.predators:  # keep the cone on the nearest known predator
+            px, py, _ = min(self.predators, key=lambda q: math.hypot(q[0] - m["x"], q[1] - m["y"]))
+            if math.hypot(px - m["x"], py - m["y"]) < 450:
+                rel = wrap(math.atan2(py - m["y"], px - m["x"]) - m["h"])
+                if abs(rel) > 0.25:
+                    return 0.0, 0.0, rel
         return 0.0, 0.0, 0.0
 
     def _start_hop(self, a, m, obs):
@@ -490,6 +498,45 @@ class Hivemind:
         return a["speed"], rel, rel if abs(rel) > 0.3 else 0.0
 
     # ---------------- helpers ----------------
+    def _flee_dir(self, m, away_rel):
+        """Pick the flee direction (relative) closest to `away_rel` whose next 60 px stay on walkable ground:
+        no river/swamp cells, no boundary, no known obstacle edge in the way. Unlocalized agents just go away."""
+        if m["err"] > LOC_OK:
+            return away_rel
+        best = None
+        for k in (0, 1, -1, 2, -2, 3, -3, 4, -4):
+            rel = away_rel + k * 0.35
+            ang = m["h"] + rel
+            cost = abs(k) * 0.5
+            for step in (20, 40, 60):
+                x, y = m["x"] + step * math.cos(ang), m["y"] + step * math.sin(ang)
+                if not (WALL + 8 < x < W - WALL - 8 and WALL + 8 < y < H - WALL - 8):
+                    cost += 10
+                    break
+                b = self.terrain.get((int(x // 40), int(y // 40)))
+                cost += {"river": 6, "swamp": 3, "desert": 0.5}.get(b, 0)
+            if self._blocked_abs(m["x"], m["y"], m["x"] + 60 * math.cos(ang), m["y"] + 60 * math.sin(ang)):
+                cost += 10
+            if best is None or cost < best[0]:
+                best = (cost, rel)
+        return best[1]
+
+    def _blocked_abs(self, x1, y1, x2, y2):
+        """Does the absolute segment cross any learned obstacle edge near it?"""
+        for segs in self.landmarks.values():
+            for ax1, ay1, ax2, ay2 in segs:
+                if abs(ax1 - x1) > 200 or abs(ay1 - y1) > 200:
+                    continue
+                px, py, ex, ey = x2 - x1, y2 - y1, ax2 - ax1, ay2 - ay1
+                den = px * ey - py * ex
+                if abs(den) < 1e-9:
+                    continue
+                t = ((ax1 - x1) * ey - (ay1 - y1) * ex) / den
+                u = ((ax1 - x1) * py - (ay1 - y1) * px) / den
+                if 0 <= t <= 1 and 0 <= u <= 1:
+                    return True
+        return False
+
     @staticmethod
     def _blocked(d, ang, edges):
         """True if the straight walk to a point at (d, ang) crosses a visible edge (agent frame)."""
