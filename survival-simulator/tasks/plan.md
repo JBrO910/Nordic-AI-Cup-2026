@@ -98,7 +98,7 @@ Obstacle tasks (2–5) ──► T6 early survey ──► T7 grove preference �
 ## Task List
 - [x] Task 6 (skipped: coverage already 76–83 % at t=300): Early survey — while t < 300 s, localized, energy > 120 and no fruit in sight: walk to the stalest
       grid cell instead of sitting. Metric: known trees / real trees at t=300 (world-map coverage) + 12-seed score.
-- [ ] Task 7: Grove preference — `_relocate_to_tree` scores candidates by fruiting trees within 120 px (recency
+- [x] Task 7: Grove preference — `_relocate_to_tree` scores candidates by fruiting trees within 120 px (recency
       weighted) minus distance. Metric: fruit eaten/rotted ratio + 12-seed score.
 - [ ] Task 8: Less early wandering — only if movement cost is still > 1 energy/s per agent for t < 300 after T6/T7:
       raise the spread threshold and hop patience during that window. Metric: cost-by-mode attribution + score.

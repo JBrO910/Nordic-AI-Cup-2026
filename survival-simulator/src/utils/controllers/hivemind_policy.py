@@ -32,6 +32,8 @@ LOC_OK = 12              # position error (px) below which we trust the absolute
 FRUIT_REACH = 200        # walk to a known fruit up to this far
 HOME_REACH = 320         # relocate to a tree up to this far when none is near
 NEAR_TREE = 50           # a known tree this close = stay put
+GROVE_R = 120            # trees within this of a spot all feed it
+GROVE_VALUE = 80         # px of walking one extra fruiting tree is worth
 SPREAD_DIST = 110        # idle agents keep at least this far apart
 SCAN_EVERY = [(0, 30), (1500, 25)]               # ticks between scans while sitting
 FRUIT_TTL, TREE_TTL, FRUITING_TTL = 500, 600, 400
@@ -489,7 +491,7 @@ class Hivemind:
             if any(math.hypot(tr[0] - om["x"], tr[1] - om["y"]) < SPREAD_DIST for oid, om in self.mem.items()
                    if oid != a["agent_id"] and om["err"] <= LOC_OK):
                 continue
-            score = d + (0 if self.tick - tr[3] < FRUITING_TTL else 100)
+            score = d - GROVE_VALUE * self._grove_value(tr)
             if best is None or score < best[0]:
                 best = (score, tr)
         if not best:
@@ -500,6 +502,15 @@ class Hivemind:
         m["fruit_tick"], m["target_xy"] = self.tick, (tx, ty)
         m["mode"] = "totree"
         return min(a["speed"], d - 15), rel, rel if abs(rel) > 0.5 else 0.0
+
+    def _grove_value(self, spot):
+        """Expected fruit rate around a spot: known trees within GROVE_R, each weighted by how recently it fruited."""
+        total = 0.0
+        for tr in self.trees:
+            if math.hypot(tr[0] - spot[0], tr[1] - spot[1]) < GROVE_R:
+                age = self.tick - tr[3]
+                total += 1.0 if age < FRUITING_TTL else (0.3 if age < 3 * FRUITING_TTL else 0.1)
+        return total
 
     def _explore(self, a, m, obs, edges):
         """Nothing known nearby: localized agents head for the stalest grid cell, others hop blindly."""

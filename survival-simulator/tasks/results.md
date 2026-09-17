@@ -46,3 +46,4 @@ All rows: `python evaluate.py` unless noted. Score ≈ survived seconds; kills =
 
 Task 6 (early survey) skipped: the map is already ~80 % known by t=300; the +30 % target is unreachable. Rotting fruit
 is a matter of not sitting at the right trees (Task 7), not of not knowing where trees are.
+| Task 7 grove preference (`_grove_value`, GROVE_R 120, GROVE_VALUE 80) | 1180 | **1142** | 837 | 44.5 | **accepted**: +155 s vs Task 3; capture ratio inconclusive (seed 2: 84 vs 82 %, seed 4: 67 vs 72 %) |
