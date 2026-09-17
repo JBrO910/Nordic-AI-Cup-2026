@@ -85,3 +85,29 @@ Reward = −energy spent/100 per tick, −5 on death. Agent energy U(40,400), pr
 at most ~+20 s. Time goes to walking between trees and camping at fruitless ones; the local frame's drift makes long
 relocations (grove preference) lose. Eval noise is sd ≈ 330 s per seed, so any change under ~±70 s needs 24+ seeds to call.
 Final policy = Task 1 state: 24-seed mean survived 1124 s (baseline 1105).
+
+### Population cap sweep (2026-09-18): `POP_CAP` schedule, `scratch/cap_sweep.sh`
+
+Runs of the same seed are **not reproducible** (`environment.py` hands the policy `set`s of entities, so observation order
+follows memory addresses; seed 1 gave 710 s and 1266 s for the identical policy). Seeds are therefore independent samples,
+not pairs: n=24 gives SE ≈ 50 s per arm, n=72 ≈ 30 s. The round-1 control (base, 24 seeds) drew 973 s; its 48-seed re-run
+drew 1106 s — a 130 s swing with no code change, which is the noise floor to keep in mind for every table above.
+
+| `POP_CAP` | n | mean survived ± SE | min | kills/run |
+|---|---|---|---|---|
+| base `[(0,12),(600,12),(1800,5)]` | 72 | 1062 ± 30 | 581 | 48.2 |
+| flat 8 | 24 | 1087 ± 51 | 575 | 37.9 |
+| flat 10 | 24 | 1046 ± 41 | 704 | 41.5 |
+| flat 12 (no late taper) | 24 | 1072 ± 52 | 668 | 45.8 |
+| flat 14 | 72 | 1114 ± 29 | 672 | 51.4 |
+| 10 → 5 (t 600–1800) | 24 | 1054 ± 44 | 682 | 42.3 |
+| 12 → 3 (t 600–1800) | 72 | 1096 ± 29 | 469 | 48.1 |
+| 12 → 5 earlier (t 300–1200) | 72 | 1104 ± 29 | 542 | 46.4 |
+| 12 → 5 later (t 1200–2400) | 24 | 1083 ± 61 | 468 | 52.0 |
+| 8 → 14 (few early, many late) | 72 | 1103 ± 32 | 485 | 43.9 |
+| 6 → 12 (t 0–900) | 24 | 1031 ± 55 | 528 | 41.2 |
+
+**Conclusion:** every schedule lands in 1030–1115 s; the best point estimate (flat 14, +52 ± 42 s) is within noise and the
+12-seed Tasks 9–10 found 16/20 worse. Agent count in 8–14, with or without a taper in either direction, does not move
+survival. `POP_CAP` stays `[(0,12),(600,12),(1800,5)]`. Kills scale with the cap (flat 8: 38, flat 14: 51) while survival
+does not, so more agents ≈ more predator food, fewer agents ≈ less foraging — the two cancel.
