@@ -60,10 +60,10 @@ T1 stuck metric (scratch/stuck.py)
 - [x] Each fix committed separately with its numbers
 
 ### Phase 3: Wrap up
-- [ ] Task 5: Re-record `scratch/trajectory_seed3_300s.pkl`, all tests green, results logged
+- [x] Task 5: Re-record `scratch/trajectory_seed3_300s.pkl`, all tests green, results logged
 
 ### Checkpoint: Complete
-- [ ] `tasks/results.md` has baseline + per-fix stuck fractions and 12-seed scores
+- [x] `tasks/results.md` has baseline + per-fix stuck fractions and 12-seed scores
 
 ## Risks and Mitigations
 | Risk | Impact | Mitigation |

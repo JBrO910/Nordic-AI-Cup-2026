@@ -88,18 +88,18 @@ both endpoints are also blocked.
 **Description:** Re-record the replay trajectory with the accepted policy, run all tests, log final numbers.
 
 **Acceptance criteria:**
-- [ ] `python tests/test_policy_equivalence.py record` then all three tests print ok
-- [ ] Final rows in `tasks/results.md`; commit
+- [x] `python tests/test_policy_equivalence.py record` then all tests print ok
+- [x] Final rows in `tasks/results.md`; commit
 
 **Verification:**
-- [ ] `for t in tests/*.py: python $t`
+- [x] `for t in tests/*.py: python $t`
 
 **Dependencies:** Checkpoint A
 **Files:** `scratch/trajectory_seed3_300s.pkl`, `tasks/results.md`
 **Scope:** XS
 
 ## Checkpoint: Complete
-- [ ] Stuck fraction and 12-seed score both logged; agents no longer visibly run against obstacles in
+- [x] Stuck fraction and 12-seed score both logged (stuck 9–12 % → 2–5 %; 987 s / 46.9 kills); check visually in
       `python local_playground.py`
 
 ## Task 6: Early survey (explore while it is cheap)
