@@ -10,12 +10,12 @@ Record every result in `tasks/results.md` (policy, commit hash, mean, min surviv
 1–12, and report kills (count of score drops) next to the eaten-energy penalty.
 
 **Acceptance criteria:**
-- [ ] `python evaluate.py --policy src.utils.controllers.dummy_agent_policy:dummy` and `--policy ...:Hivemind` both run
-- [ ] Output has one line per (seed, repeat) plus MEAN / MIN / total kills
-- [ ] `--repeat 2` doubles the rows
+- [x] `python evaluate.py --policy src.utils.controllers.dummy_agent_policy:dummy` and `--policy ...:Hivemind` both run
+- [x] Output has one line per (seed, repeat) plus MEAN / MIN / total kills
+- [x] `--repeat 2` doubles the rows
 
 **Verification:**
-- [ ] Manual: run with `--seeds 1 2 --max-time 200` for both policies, check columns
+- [x] Manual: run with `--seeds 1 2 --max-time 200` for both policies, check columns (`tests/test_evaluate.py` = ok)
 
 **Dependencies:** None
 **Files:** `evaluate.py`

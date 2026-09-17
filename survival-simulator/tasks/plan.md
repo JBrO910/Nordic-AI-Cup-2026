@@ -36,7 +36,7 @@ T1 harness (12 seeds, --policy, --repeat, kills column)
 ## Task List
 
 ### Phase 0: Measurement
-- [ ] Task 1: `evaluate.py` — `--policy module:Class`, `--repeat N`, 12-seed default, kills column
+- [x] Task 1: `evaluate.py` — `--policy module:Class`, `--repeat N`, 12-seed default, kills column
 - [ ] Task 2: Noise floor — run current policy twice on 12 seeds, record spread in `tasks/results.md`
 - [ ] Task 3: Reconstruct version 3 as `src/utils/controllers/simple_policy.py`
 - [ ] Task 4: A/B simple vs hivemind on 12 seeds → choose base, commit both
