@@ -49,7 +49,7 @@ T1 stuck metric (scratch/stuck.py)
 ### Phase 2: Fixes (one ablation each, in order of expected impact)
 - [ ] Task 2: Heard-through-wall fruit — localized agents filter fruit and claims with `_blocked_abs`; turn toward
       heard fruit before walking
-- [ ] Task 3: Stuck detector — landmark fix snaps position back ≥ 60 % of the commanded move for 5 ticks →
+- [x] Task 3: Stuck detector — landmark fix snaps position back ≥ 60 % of the commanded move for 5 ticks →
       drop target/claim, blacklist it 200 ticks, hop perpendicular to the wall
 - [x] Task 4 (rejected by gate, reverted): One-corner detour — when the straight line to a tree/fruit target crosses a landmark edge, aim for
       the nearer endpoint (+15 px clearance) first

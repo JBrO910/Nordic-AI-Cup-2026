@@ -35,7 +35,9 @@ NEAR_TREE = 50           # a known tree this close = stay put
 SPREAD_DIST = 110        # idle agents keep at least this far apart
 SCAN_EVERY = [(0, 30), (1500, 25)]               # ticks between scans while sitting
 FRUIT_TTL, TREE_TTL, FRUITING_TTL = 500, 600, 400
-STUCK_TICKS = 40
+STUCK_SNAPS = 5          # consecutive ticks the pose fix undoes our commanded move -> we are pushing on a wall
+STUCK_SNAP_FRACTION = 0.6
+BLACKLIST_TICKS = 200    # how long an unreachable target stays off-limits
 BIOME_PENALTY = {"swamp": 0.5, "desert": 0.8, "river": 0.3}
 
 
@@ -110,7 +112,7 @@ class Hivemind:
                                      next_scan=self.rng.randint(20, 60), fruit_tick=self.tick,
                                      hop_until=0, hop_dir=0.0, prev_energy=None, expected_drop=0.0,
                                      aging=False, wall_cooldown=0, sprinting=False, mode="",
-                                     target=None, target_d=1e9, target_tick=0)
+                                     target=None, target_xy=None, last_step=0.0, stuck=0, blacklist=[])
         return m
 
     # ---------------- main entry ----------------
@@ -143,6 +145,7 @@ class Hivemind:
             cost, real = move_cost(a, dist)
             m["expected_drop"] = 0.1 + cost + min(math.pi, abs(turn)) / (2 * math.pi) + (100 if spawn else 0)
             real *= BIOME_PENALTY.get(a["biome"], 1.0)
+            m["last_step"] = real
             m["x"] += real * math.cos(m["h"] + direction)
             m["y"] += real * math.sin(m["h"] + direction)
             m["err"] += 0.2 * real  # obstacle deflection is invisible to us
@@ -157,17 +160,37 @@ class Hivemind:
         for a in agents:
             m = self._mem(a["agent_id"])
             edges = [o["coords"] for o in a["observations"] if o["type"] == "Edge"]
-            self._fix_pose(m, edges)
+            self._fix_pose(a, m, edges)
             if m["err"] <= 1:
                 self._learn_landmarks(m, edges)
         self._propagate_fixes(agents)
 
-    def _fix_pose(self, m, edges):
+    def _fix_pose(self, a, m, edges):
         """Adopt the best pose fix visible this tick: a boundary wall first, else a learned landmark."""
         fixes = [f for f in map(fix_from_edge, edges) if f]
         best = min(fixes, key=lambda f: f[3]) if fixes else self._fix_from_landmarks(edges, m)
         if best and best[3] < m["err"]:
+            self._note_snapback(a, m, best[0], best[1], m["last_step"])
             m["x"], m["y"], m["h"], m["err"] = best
+
+    def _note_snapback(self, a, m, fx, fy, step):
+        """A pose fix that undoes most of last tick's commanded move means the wall took it: after STUCK_SNAPS
+        such ticks give the target up, blacklist it, and hop sideways along the wall."""
+        snap = math.hypot(m["x"] - fx, m["y"] - fy)
+        m["stuck"] = m["stuck"] + 1 if step > 2 and snap >= STUCK_SNAP_FRACTION * step else 0
+        if m["stuck"] < STUCK_SNAPS:
+            return
+        if m["target_xy"] is not None:
+            m["blacklist"].append((m["target_xy"][0], m["target_xy"][1], self.tick + BLACKLIST_TICKS))
+        self.claims.pop(a["agent_id"], None)
+        m["target"], m["target_xy"], m["stuck"] = None, None, 0
+        wall_dir = math.atan2(m["y"] - fy, m["x"] - fx)  # the direction we were being pushed back from
+        m["hop_dir"] = wall_dir + self.rng.choice((-1, 1)) * math.pi / 2
+        m["hop_until"] = self.tick + 15
+
+    def _is_blacklisted(self, m, x, y):
+        m["blacklist"] = [b for b in m["blacklist"] if b[2] > self.tick]
+        return any(math.hypot(b[0] - x, b[1] - y) < 25 for b in m["blacklist"])
 
     def _learn_landmarks(self, m, edges):
         """An exactly localized agent records every obstacle edge it sees in absolute coordinates."""
@@ -300,7 +323,7 @@ class Hivemind:
                        for a, m in loc for i, f in enumerate(self.fruits))
         taken = set()
         for d, aid, i in pairs:
-            if d > FRUIT_REACH or aid in self.claims or i in taken:
+            if d > FRUIT_REACH or aid in self.claims or i in taken                     or self._is_blacklisted(self.mem[aid], self.fruits[i][0], self.fruits[i][1]):
                 continue
             self.claims[aid] = i
             taken.add(i)
@@ -417,15 +440,8 @@ class Hivemind:
             return None
         tx, ty = self.fruits[claim][:2]
         d = math.hypot(tx - m["x"], ty - m["y"])
-        if claim != m["target"]:
-            m["target"], m["target_d"], m["target_tick"] = claim, d, self.tick
-        elif d < m["target_d"] - 5:
-            m["target_d"], m["target_tick"] = d, self.tick
-        elif self.tick - m["target_tick"] > STUCK_TICKS:
-            self.fruits.pop(claim)
-            self.claims = {}
-            m["target"] = None
-        if m["target"] is None or d <= 4:
+        m["target"], m["target_xy"] = claim, (tx, ty)
+        if d <= 4:
             return None
         m["fruit_tick"] = self.tick
         rel = wrap(math.atan2(ty - m["y"], tx - m["x"]) - m["h"])
@@ -468,7 +484,7 @@ class Hivemind:
         best = None
         for tr in self.trees:
             d = math.hypot(tr[0] - m["x"], tr[1] - m["y"])
-            if d > HOME_REACH or (near_tree and d < NEAR_TREE):
+            if d > HOME_REACH or (near_tree and d < NEAR_TREE) or self._is_blacklisted(m, tr[0], tr[1]):
                 continue
             if any(math.hypot(tr[0] - om["x"], tr[1] - om["y"]) < SPREAD_DIST for oid, om in self.mem.items()
                    if oid != a["agent_id"] and om["err"] <= LOC_OK):
@@ -481,7 +497,7 @@ class Hivemind:
         tx, ty = best[1][0], best[1][1]
         d = math.hypot(tx - m["x"], ty - m["y"])
         rel = wrap(math.atan2(ty - m["y"], tx - m["x"]) - m["h"])
-        m["fruit_tick"] = self.tick
+        m["fruit_tick"], m["target_xy"] = self.tick, (tx, ty)
         m["mode"] = "totree"
         return min(a["speed"], d - 15), rel, rel if abs(rel) > 0.5 else 0.0
 
