@@ -60,7 +60,7 @@ perpendicular to the nearest landmark edge. Replaces the 40-tick timer in `_go_t
 **Files:** `src/utils/controllers/hivemind_policy.py`
 **Scope:** S
 
-## Task 4: One-corner detour for absolute targets
+## Task 4: One-corner detour for absolute targets — REJECTED (12-seed gate: survival 997 → 753 s; see results.md)
 
 **Description:** In `_go_to_claim` and `_relocate_to_tree`, before walking straight at (tx, ty), test the segment
 with `_blocked_abs` against landmarks within 250 px. If blocked by edge E, steer for E's endpoint nearest the target,

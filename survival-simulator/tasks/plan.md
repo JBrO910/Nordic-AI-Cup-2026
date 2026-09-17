@@ -51,7 +51,7 @@ T1 stuck metric (scratch/stuck.py)
       heard fruit before walking
 - [ ] Task 3: Stuck detector — landmark fix snaps position back ≥ 60 % of the commanded move for 5 ticks →
       drop target/claim, blacklist it 200 ticks, hop perpendicular to the wall
-- [ ] Task 4: One-corner detour — when the straight line to a tree/fruit target crosses a landmark edge, aim for
+- [x] Task 4 (rejected by gate, reverted): One-corner detour — when the straight line to a tree/fruit target crosses a landmark edge, aim for
       the nearer endpoint (+15 px clearance) first
 
 ### Checkpoint A
