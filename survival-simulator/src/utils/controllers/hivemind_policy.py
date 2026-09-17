@@ -157,27 +157,32 @@ class Hivemind:
         for a in agents:
             m = self._mem(a["agent_id"])
             edges = [o["coords"] for o in a["observations"] if o["type"] == "Edge"]
-            best = None
-            for c in edges:
-                f = fix_from_edge(c)
-                if f and (best is None or f[3] < best[3]):
-                    best = f
-            if best is None:
-                best = self._fix_from_landmarks(edges, m)
-            if best and best[3] < m["err"]:
-                m["x"], m["y"], m["h"], m["err"] = best
-            if m["err"] <= 1:  # learn obstacle edges as landmarks (exactness spreads out from the walls)
-                ch, sh = math.cos(m["h"]), math.sin(m["h"])
-                for (rx1, ry1), (rx2, ry2) in edges:
-                    L = math.hypot(rx2 - rx1, ry2 - ry1)
-                    if L >= 1000:
-                        continue
-                    seg = (m["x"] + rx1 * ch - ry1 * sh, m["y"] + rx1 * sh + ry1 * ch,
-                           m["x"] + rx2 * ch - ry2 * sh, m["y"] + rx2 * sh + ry2 * ch)
-                    lst = self.landmarks.setdefault(round(L, 4), [])
-                    if not any(abs(seg[0] - l[0]) < 0.5 and abs(seg[1] - l[1]) < 0.5 for l in lst):
-                        lst.append(seg)
-        for a in agents:  # propagate: a well-localized agent fixes the agents it sees
+            self._fix_pose(m, edges)
+            if m["err"] <= 1:
+                self._learn_landmarks(m, edges)
+        self._propagate_fixes(agents)
+
+    def _fix_pose(self, m, edges):
+        """Adopt the best pose fix visible this tick: a boundary wall first, else a learned landmark."""
+        fixes = [f for f in map(fix_from_edge, edges) if f]
+        best = min(fixes, key=lambda f: f[3]) if fixes else self._fix_from_landmarks(edges, m)
+        if best and best[3] < m["err"]:
+            m["x"], m["y"], m["h"], m["err"] = best
+
+    def _learn_landmarks(self, m, edges):
+        """An exactly localized agent records every obstacle edge it sees in absolute coordinates."""
+        for (rx1, ry1), (rx2, ry2) in edges:
+            L = math.hypot(rx2 - rx1, ry2 - ry1)
+            if L >= 1000:
+                continue  # boundary wall, handled by fix_from_edge
+            seg = (*self._to_world(m, rx1, ry1), *self._to_world(m, rx2, ry2))
+            lst = self.landmarks.setdefault(round(L, 4), [])
+            if not any(abs(seg[0] - l[0]) < 0.5 and abs(seg[1] - l[1]) < 0.5 for l in lst):
+                lst.append(seg)
+
+    def _propagate_fixes(self, agents):
+        """A well-localized agent fixes the position and heading of every agent it sees."""
+        for a in agents:
             m = self._mem(a["agent_id"])
             if m["err"] > LOC_OK:
                 continue
@@ -187,11 +192,20 @@ class Hivemind:
                 om = self.mem[o["id"]]
                 if om["err"] <= m["err"] + 5:
                     continue
-                ang = m["h"] + o["angle"]
-                om["x"] = m["x"] + o["distance"] * math.cos(ang)
-                om["y"] = m["y"] + o["distance"] * math.sin(ang)
+                om["x"], om["y"] = self._polar_to_world(m, o["distance"], o["angle"])
                 om["h"] = wrap(math.atan2(m["y"] - om["y"], m["x"] - om["x"]) - o["rel_dir"])
                 om["err"] = m["err"] + 5
+
+    @staticmethod
+    def _to_world(m, rx, ry):
+        """Agent-frame (x forward, y left) point -> absolute point."""
+        ch, sh = math.cos(m["h"]), math.sin(m["h"])
+        return m["x"] + rx * ch - ry * sh, m["y"] + rx * sh + ry * ch
+
+    @staticmethod
+    def _polar_to_world(m, d, ang):
+        """Observation (distance, relative angle) -> absolute point."""
+        return m["x"] + d * math.cos(m["h"] + ang), m["y"] + d * math.sin(m["h"] + ang)
 
     def _fix_from_landmarks(self, edges, m):
         """Pose from learned obstacle edges. Same-length siblings (and corner-grazed far edges) are
@@ -224,43 +238,49 @@ class Hivemind:
             m = self._mem(a["agent_id"])
             if m["err"] > LOC_OK:
                 continue
-            obs = a["observations"]
-            edges = [o["coords"] for o in obs if o["type"] == "Edge"]
+            edges = [o["coords"] for o in a["observations"] if o["type"] == "Edge"]
             self.cell_seen[(int(m["x"] // CELL), int(m["y"] // CELL))] = self.tick
             self.terrain[(int(m["x"] // 40), int(m["y"] // 40))] = a["biome"]
-            hear = a["hearing_radius"] - 8
-            # things we should perceive (hearing, or unblocked in the vision cone) but don't are gone
-            def perceivable(px, py):
-                d = math.hypot(px - m["x"], py - m["y"])
-                if d <= hear:
-                    return True
-                ang = wrap(math.atan2(py - m["y"], px - m["x"]) - m["h"])
-                return (d <= a["vision_range"] - 15 and abs(ang) < a["vision_angle"] / 2 - 0.08
-                        and not self._blocked(d, ang, edges))
-            self.fruits = [f for f in self.fruits if not perceivable(f[0], f[1])]
-            self.trees = [tr for tr in self.trees if not perceivable(tr[0], tr[1])]
-            seen_fruit = []
-            for o in obs:
-                if o["type"] in ("Fruit", "Tree", "Predator"):
-                    ang = m["h"] + o["angle"]
-                    wx, wy = m["x"] + o["distance"] * math.cos(ang), m["y"] + o["distance"] * math.sin(ang)
-                    if o["type"] == "Fruit":
-                        if o["distance"] < hear + 8 and self._blocked(o["distance"], o["angle"], edges):
-                            continue  # heard through a wall: unreachable, keep it out of the map
-                        self._upsert(self.fruits, wx, wy, 8, [wx, wy, self.tick])
-                        seen_fruit.append((wx, wy))
-                    elif o["type"] == "Tree":
-                        rec = self._upsert(self.trees, wx, wy, 25, [wx, wy, self.tick, -10**9])
-                        rec[2] = self.tick
-                    else:
-                        self._upsert(self.predators, wx, wy, 40, [wx, wy, self.tick])
-            for fx, fy in seen_fruit:
-                for tr in self.trees:
-                    if math.hypot(tr[0] - fx, tr[1] - fy) < 80:
-                        tr[3] = self.tick
+            self._prune_unseen(a, m, edges)
+            self._record_sightings(a, m, edges)
         self.fruits = [f for f in self.fruits if self.tick - f[2] < FRUIT_TTL]
         self.trees = [tr for tr in self.trees if self.tick - tr[2] < TREE_TTL]
         self.predators = [p for p in self.predators if self.tick - p[2] < 100]
+
+    def _prune_unseen(self, a, m, edges):
+        """Map entries this agent should perceive (hearing, or unblocked in its cone) but doesn't are gone."""
+        hear = a["hearing_radius"] - 8
+        def perceivable(px, py):
+            d = math.hypot(px - m["x"], py - m["y"])
+            if d <= hear:
+                return True
+            ang = wrap(math.atan2(py - m["y"], px - m["x"]) - m["h"])
+            return (d <= a["vision_range"] - 15 and abs(ang) < a["vision_angle"] / 2 - 0.08
+                    and not self._blocked(d, ang, edges))
+        self.fruits = [f for f in self.fruits if not perceivable(f[0], f[1])]
+        self.trees = [tr for tr in self.trees if not perceivable(tr[0], tr[1])]
+
+    def _record_sightings(self, a, m, edges):
+        """Add this tick's fruit, tree and predator observations to the shared map; mark trees with fruit near."""
+        hear = a["hearing_radius"] - 8
+        seen_fruit = []
+        for o in a["observations"]:
+            if o["type"] not in ("Fruit", "Tree", "Predator"):
+                continue
+            wx, wy = self._polar_to_world(m, o["distance"], o["angle"])
+            if o["type"] == "Fruit":
+                if o["distance"] < hear + 8 and self._blocked(o["distance"], o["angle"], edges):
+                    continue  # heard through a wall: unreachable, keep it out of the map
+                self._upsert(self.fruits, wx, wy, 8, [wx, wy, self.tick])
+                seen_fruit.append((wx, wy))
+            elif o["type"] == "Tree":
+                self._upsert(self.trees, wx, wy, 25, [wx, wy, self.tick, -10**9])[2] = self.tick
+            else:
+                self._upsert(self.predators, wx, wy, 40, [wx, wy, self.tick])
+        for fx, fy in seen_fruit:
+            for tr in self.trees:
+                if math.hypot(tr[0] - fx, tr[1] - fy) < 80:
+                    tr[3] = self.tick
 
     @staticmethod
     def _upsert(lst, x, y, radius, rec):
