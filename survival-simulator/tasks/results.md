@@ -100,3 +100,4 @@ ceiling of any "early fruit rush"); first predator arrives by t≈100–150 in e
 
 Lesson: leaving trees sooner converts `camp` ticks into `totree` walking, which costs more than sitting. The local policy's
 camping patience (200 ticks) is already on the short side; if anything, try *longer* patience next.
+| C `NO_FRUIT_GIVEUP` 200 → 300 (longer patience) | 1119 | −5 ± 71 | 12/24 | 563 | **rejected** (flat); kills 43.0 vs 46.9. Camping patience is at its optimum between 100 and 300. |
