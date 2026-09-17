@@ -126,10 +126,10 @@ Phase 4 (T6–T8) ──► T9 predator-aware cap ──► T10 schedule ablatio
 ```
 
 ## Task List
-- [ ] Task 9: Predator-aware cap — `_pop_cap(t)`: 20 until first predator sighting or t ≥ 250; 12 until a second
+- [x] Task 9 (rejected by gate, reverted): Predator-aware cap — `_pop_cap(t)`: 20 until first predator sighting or t ≥ 250; 12 until a second
       distinct predator (two sightings ≥ 300 px apart) or t ≥ 600; then the current schedule. Unit-tested with
       synthetic sightings. Metrics: peak population, coverage at t=300, kills, 12-seed score.
-- [ ] Task 10: Schedule ablation — early cap 16 / 20 / 24 on 12 seeds; keep the best, log all three.
+- [x] Task 10 (all variants rejected): Schedule ablation — early cap 16 / 20 / 24 on 12 seeds; keep the best, log all three.
 
 ### Checkpoint C
-- [ ] Coverage at t=300 up vs Phase 4, kills not up beyond noise, 12-seed mean not worse; commits with numbers.
+- [x] Both cap variants lose ≥ 159 s vs Task 7; reverted. Final policy: 1142 s / 44.5 kills on 12 seeds.

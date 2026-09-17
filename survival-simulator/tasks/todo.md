@@ -156,7 +156,7 @@ Tasks 6–7: during that window raise `SPREAD_DIST` hops' threshold and `HOP_AFT
 - [x] Coverage at t=300 already 76–83 % (T6 skipped); 12-seed mean up 987 → 1142 s (T7); T8 rejected
 - [x] Tasks 6–8 each committed with numbers
 
-## Task 9: Predator-aware population cap
+## Task 9: Predator-aware population cap — REJECTED (12-seed gate: 1142 → 930 s; see results.md)
 
 **Description:** Replace the time-only `POP_CAP` lookup in `_choose_spawners` with `_pop_cap(t)`: 20 while no predator
 has been sighted and t < 250; 12 until a second distinct predator has been sighted (two entries in `self.predators`
@@ -176,13 +176,13 @@ sightings and times.
 **Files:** `src/utils/controllers/hivemind_policy.py`, `tests/test_pop_cap.py`
 **Scope:** S
 
-## Task 10: Early-cap schedule ablation
+## Task 10: Early-cap schedule ablation — DONE, all variants rejected (16: 983 s; 20: 930 s; 24 dominated)
 
 **Description:** Run the 12-seed harness with the early cap at 16, 20 and 24 (module constant). Keep the best by mean
 survival with kills as tiebreaker; log all three rows.
 
 **Acceptance criteria:**
-- [ ] Three rows in `tasks/results.md`; chosen value committed with the numbers in the message
+- [x] Rows in `tasks/results.md`; chosen value = original 12 (cap mechanism reverted)
 
 **Verification:**
 - [ ] `python evaluate.py` ×3 (use `scratch/run_detached.ps1` + `scratch/collect.py`)
@@ -192,5 +192,5 @@ survival with kills as tiebreaker; log all three rows.
 **Scope:** XS
 
 ## Checkpoint C
-- [ ] Coverage at t=300 up vs Phase 4, kills not up beyond noise, 12-seed mean not worse
-- [ ] Tasks 9–10 committed with numbers
+- [x] Evaluated: both cap variants lose ≥ 159 s; reverted. Final policy = Task 7 state (1142 s / 44.5 kills)
+- [x] Tasks 9–10 logged with numbers

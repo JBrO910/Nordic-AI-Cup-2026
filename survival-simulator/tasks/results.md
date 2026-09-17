@@ -48,3 +48,7 @@ Task 6 (early survey) skipped: the map is already ~80 % known by t=300; the +30 
 is a matter of not sitting at the right trees (Task 7), not of not knowing where trees are.
 | Task 7 grove preference (`_grove_value`, GROVE_R 120, GROVE_VALUE 80) | 1180 | **1142** | 837 | 44.5 | **accepted**: +155 s vs Task 3; capture ratio inconclusive (seed 2: 84 vs 82 %, seed 4: 67 vs 72 %) |
 | Task 8 less early wandering (spread 70 px, patience 30 s for t<300) | 995 | 975 | 674 | 49.7 | **rejected**: early movement 2.7 → 1.9 energy/s per agent, but survival −167 s vs Task 7. Early spreading pays for itself. |
+| Task 9 predator-aware cap (20 → 12 → schedule) | 955 | 930 | 586 | 44.8 | **rejected**: peak pop 21.5 as intended, coverage 91/60/46 %, survival −212 s vs Task 7 |
+| Task 10 early cap 16 | 1007 | 983 | 606 | 52.0 | **rejected**: −159 s vs Task 7; 24 skipped (dominated). Cap stays at 12. |
+
+**Final policy = Task 7 state (commit with "grove preference"): 12-seed mean survived 1142 s, min 837 s, 44.5 kills/run.**
