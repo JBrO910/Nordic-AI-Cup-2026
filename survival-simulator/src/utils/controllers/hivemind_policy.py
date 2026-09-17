@@ -20,7 +20,6 @@ POP_CAP = [(0, 12), (400, 12), (1000, 7), (1800, 5), (2400, 4)]   # (sim_time, c
 RESERVE = [(0, 150), (1800, 80)]                 # keep this much after spawning
 RESERVE_FREE = 60        # ...when the map shows an unoccupied fruiting tree
 DUMP_OVERSHOOT = 4       # old-age dumps may exceed the cap by this many
-SCAN_EVERY = [(0, 50), (1500, 30)]               # ticks between scans while sitting
 SCAN_EVERY_ALERT = 20
 OLD_AGE, OLD_DUMP_ENERGY = 55, 250
 HOP_AFTER = 150          # ticks without seeing fruit -> go somewhere else
@@ -34,7 +33,7 @@ FRUIT_REACH = 200        # walk to a known fruit up to this far
 HOME_REACH = 320         # relocate to a tree up to this far when none is near
 NEAR_TREE = 50           # a known tree this close = stay put
 SPREAD_DIST = 110        # idle agents keep at least this far apart
-SCAN_EVERY = [(0, 30), (1500, 25)]               # ticks between scans while sitting (overrides above)
+SCAN_EVERY = [(0, 30), (1500, 25)]               # ticks between scans while sitting
 FRUIT_TTL, TREE_TTL, FRUITING_TTL = 500, 600, 400
 STUCK_TICKS = 40
 BIOME_PENALTY = {"swamp": 0.5, "desert": 0.8, "river": 0.3}
@@ -404,7 +403,8 @@ class Hivemind:
             crowd = [(math.hypot(om["x"] - m["x"], om["y"] - m["y"]), oid) for oid, om in self.mem.items()
                      if oid != a["agent_id"] and om["err"] <= LOC_OK and om["mode"] in ("sit", "scan", "")]
             d_crowd, oid = min(crowd) if crowd else (1e9, None)
-            if d_crowd < SPREAD_DIST and (self.energy[oid], -oid) < (a["energy"], -a["agent_id"])                     and a["energy"] > HOP_MIN_ENERGY and self.tick >= m["hop_until"]:
+            richer = oid is not None and (self.energy[oid], -oid) < (a["energy"], -a["agent_id"])
+            if d_crowd < SPREAD_DIST and richer and a["energy"] > HOP_MIN_ENERGY and self.tick >= m["hop_until"]:
                 om = self.mem[oid]
                 m["hop_until"] = self.tick + 15
                 m["hop_dir"] = math.atan2(m["y"] - om["y"], m["x"] - om["x"]) + self.rng.uniform(-0.4, 0.4)
@@ -476,7 +476,7 @@ class Hivemind:
         return 0.0, 0.0, 0.0
 
     def _start_hop(self, a, m, obs):
-        """Head away from visible agents (or toward the map centre / randomly) for a committed leg."""
+        """Head away from visible agents (or randomly) for a committed leg."""
         m["hop_until"] = self.tick + HOP_TICKS
         m["fruit_tick"] = self.tick
         others = [o for o in obs if o["type"] == "Agent"]
