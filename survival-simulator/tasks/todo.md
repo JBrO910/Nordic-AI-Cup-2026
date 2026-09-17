@@ -102,7 +102,7 @@ both endpoints are also blocked.
 - [x] Stuck fraction and 12-seed score both logged (stuck 9–12 % → 2–5 %; 987 s / 46.9 kills); check visually in
       `python local_playground.py`
 
-## Task 6: Early survey (explore while it is cheap)
+## Task 6: Early survey (explore while it is cheap) — SKIPPED: coverage already 76–83 % at t=300 (see results.md)
 
 **Description:** In `_forage`, for t < 300 s, localized agents with energy > 120 and no fruit in sight walk to the
 stalest grid cell (`_explore`) instead of sitting at the first tree; they still stop for visible fruit and still
