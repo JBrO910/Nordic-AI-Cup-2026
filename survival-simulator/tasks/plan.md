@@ -76,3 +76,32 @@ T1 stuck metric (scratch/stuck.py)
 ## Open Questions
 - None blocking. The simulator's deflection behaviour is fixed (evaluation uses the same code), so all fixes live in
   the controller.
+
+---
+
+# Phase 4 (appended 2026-09-17): early exploration, grove preference, less early wandering
+
+## Findings that motivate it
+- "Sprinting at the beginning": measured 0.0 % sprint ticks for t < 200 s (seed 3). What is visible is walking at
+  full walk speed in 30–39 % of agent-ticks. Energy cost is per pixel (0.05/px) regardless of speed, so the lever
+  is walking *less*, not slower.
+- 94 % of rotted fruit is never seen by any agent (earlier coverage measurement); early game is the cheapest time
+  to map trees, landmarks and terrain (food abundant, predators rare).
+- Fruit spawns ≤ 60 px from each fruiting tree at 0.1/s independently, so a spot within reach of k fruiting trees
+  yields k× the intake. `_relocate_to_tree` scores single trees; it should score spots.
+
+## Dependency graph
+```
+Obstacle tasks (2–5) ──► T6 early survey ──► T7 grove preference ──► T8 less early wandering ──► Checkpoint B
+```
+
+## Task List
+- [ ] Task 6: Early survey — while t < 300 s, localized, energy > 120 and no fruit in sight: walk to the stalest
+      grid cell instead of sitting. Metric: known trees / real trees at t=300 (world-map coverage) + 12-seed score.
+- [ ] Task 7: Grove preference — `_relocate_to_tree` scores candidates by fruiting trees within 120 px (recency
+      weighted) minus distance. Metric: fruit eaten/rotted ratio + 12-seed score.
+- [ ] Task 8: Less early wandering — only if movement cost is still > 1 energy/s per agent for t < 300 after T6/T7:
+      raise the spread threshold and hop patience during that window. Metric: cost-by-mode attribution + score.
+
+### Checkpoint B
+- [ ] Coverage at t=300 up, eaten/rotted ratio up, 12-seed mean not worse beyond noise; each task its own commit.

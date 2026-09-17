@@ -101,3 +101,57 @@ both endpoints are also blocked.
 ## Checkpoint: Complete
 - [ ] Stuck fraction and 12-seed score both logged; agents no longer visibly run against obstacles in
       `python local_playground.py`
+
+## Task 6: Early survey (explore while it is cheap)
+
+**Description:** In `_forage`, for t < 300 s, localized agents with energy > 120 and no fruit in sight walk to the
+stalest grid cell (`_explore`) instead of sitting at the first tree; they still stop for visible fruit and still
+flee. Add `scratch/coverage.py`: known trees / real trees and known landmarks at t=300 on seeds 1, 3, 6.
+
+**Acceptance criteria:**
+- [ ] Coverage at t=300 (known/real trees) up by ≥ 30 % vs current on seeds 1, 3, 6
+- [ ] 12-seed mean survival and kills not worse than baseline beyond noise
+
+**Verification:**
+- [ ] `python scratch/coverage.py 3`; `python evaluate.py`; rows in `tasks/results.md`
+
+**Dependencies:** Checkpoint A (obstacle tasks)
+**Files:** `src/utils/controllers/hivemind_policy.py`, `scratch/coverage.py`
+**Scope:** S
+
+## Task 7: Grove preference
+
+**Description:** `_relocate_to_tree` scores each candidate tree by the number of known fruiting trees within 120 px
+of it (each weighted by recency of fruit seen), minus a distance term, instead of "fruiting flag + distance". Sitting
+spot stays the chosen tree. Unit test: three trees in a cluster beat one isolated tree at equal distance.
+
+**Acceptance criteria:**
+- [ ] `tests/test_grove.py` passes
+- [ ] Fruit eaten/rotted ratio (economy script) improves on seeds 2, 4; 12-seed mean not worse beyond noise
+
+**Verification:**
+- [ ] `python tests/test_grove.py`; economy script; `python evaluate.py`; rows in `tasks/results.md`
+
+**Dependencies:** Task 6
+**Files:** `src/utils/controllers/hivemind_policy.py`, `tests/test_grove.py`
+**Scope:** S
+
+## Task 8: Less early wandering (conditional)
+
+**Description:** Only if the cost-by-mode attribution still shows > 1 energy/s per agent of movement for t < 300 after
+Tasks 6–7: during that window raise `SPREAD_DIST` hops' threshold and `HOP_AFTER` patience. Skip (mark n/a) otherwise.
+
+**Acceptance criteria:**
+- [ ] Movement cost for t < 300 ≤ 1 energy/s per agent, or task marked n/a with the measured number
+- [ ] 12-seed mean not worse beyond noise
+
+**Verification:**
+- [ ] cost-by-mode script; `python evaluate.py`; rows in `tasks/results.md`
+
+**Dependencies:** Task 7
+**Files:** `src/utils/controllers/hivemind_policy.py`
+**Scope:** XS
+
+## Checkpoint B
+- [ ] Coverage at t=300 up, eaten/rotted ratio up, 12-seed mean not worse beyond noise
+- [ ] Tasks 6–8 each committed with numbers
