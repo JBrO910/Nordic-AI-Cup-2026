@@ -327,15 +327,21 @@ class Hivemind:
 
     # ---------------- per-agent movement ----------------
     def _plan(self, a, m, t):
-        """Returns (move_distance, move_direction_rel, turn_angle)."""
+        """Priority chain; each tier returns (move_distance, move_direction_rel, turn_angle) or None to pass."""
         obs = a["observations"]
         preds = [o for o in obs if o["type"] == "Predator"]
         fruits = [o for o in obs if o["type"] == "Fruit"]
         edges = [o["coords"] for o in obs if o["type"] == "Edge"]
-        speed, sprint = a["speed"], a["sprint_speed"]
-        can_sprint = a["energy"] > 0.2 * a["max_energy"] + 5
+        return (self._flee(a, m, preds)
+                or self._eat(a, m, fruits, edges)
+                or self._scan_step(a, m)
+                or self._go_to_claim(a, m)
+                or self._forage(a, m, obs, edges)
+                or self._sit(a, m, t))
 
-        # 1. threat: face it (slightly off-centre so it pivots instead of charging), back away
+    def _flee(self, a, m, preds):
+        """Face the closest predator (slightly off-centre so it pivots instead of charging), back away from all."""
+        speed, sprint = a["speed"], a["sprint_speed"]
         if preds:
             p = min(preds, key=lambda o: o["distance"])
             m["pred"], m["pred_tick"] = wrap(m["h"] + p["angle"]), self.tick  # absolute bearing
@@ -348,117 +354,144 @@ class Hivemind:
             away = self._flee_dir(m, math.atan2(fy, fx))
             seen_by_it = p["distance"] < 60 or abs(p["rel_dir"]) < math.pi / 6 + 0.15
             limit = CHARGE_RELEASE if m["sprinting"] else CHARGE_DIST
+            can_sprint = a["energy"] > 0.2 * a["max_energy"] + 5
             m["sprinting"] = seen_by_it and p["distance"] < limit and can_sprint
-            dist = sprint if m["sprinting"] else speed
             m["scan_left"] = 0
             m["mode"] = "flee"
-            return dist, away, p["angle"] - 0.35
+            return (sprint if m["sprinting"] else speed), away, p["angle"] - 0.35
         if m["pred"] is not None and self.tick - m["pred_tick"] < FLEE_MEMORY:
             m["mode"] = "flee_mem"
             return speed, self._flee_dir(m, wrap(m["pred"] + math.pi - m["h"])), 0.0
+        return None
 
-        # 2. eat visible fruit (ignore fruit we only hear through a wall)
+    def _eat(self, a, m, fruits, edges):
+        """Walk to visible fruit (ignoring fruit only heard through a wall). Localized agents follow their
+        claim instead unless the fruit is very close. Dying agents never walk."""
         fruits = [f for f in fruits if not self._blocked(f["distance"], f["angle"], edges)]
         if fruits:
             m["fruit_tick"] = self.tick
-        if m["aging"] and not (fruits and min(f["distance"] for f in fruits) < 60):
-            m["mode"] = "aging"  # dying: don't spend energy walking
+        nearest = min((f["distance"] for f in fruits), default=None)
+        if m["aging"] and not (nearest is not None and nearest < 60):
+            m["mode"] = "aging"
             return 0.0, 0.0, 0.0
-        claim = self.claims.get(a["agent_id"])
-        if fruits and (m["err"] > LOC_OK or min(f["distance"] for f in fruits) < 70):
+        if fruits and (m["err"] > LOC_OK or nearest < 70):
             f = min(fruits, key=lambda o: o["distance"])
             m["scan_left"] = 0
             m["hop_until"] = 0
-            turn = f["angle"] if f["distance"] > 60 and abs(f["angle"]) > 0.6 else 0.0
             m["mode"] = "eat"
-            return min(speed, f["distance"] + 2), f["angle"], turn
+            turn = f["angle"] if f["distance"] > 60 and abs(f["angle"]) > 0.6 else 0.0
+            return min(a["speed"], f["distance"] + 2), f["angle"], turn
+        return None
 
-        # 3. scanning
-        if m["scan_left"] > 0:
-            m["scan_left"] -= 1
-            m["mode"] = "scan"
-            return 0.0, 0.0, a["vision_angle"]
+    def _scan_step(self, a, m):
+        """Continue a 360-degree scan in progress."""
+        if m["scan_left"] <= 0:
+            return None
+        m["scan_left"] -= 1
+        m["mode"] = "scan"
+        return 0.0, 0.0, a["vision_angle"]
 
-        # 4. walk to the fruit assigned to us (out of sight but on the map)
-        if claim:
-            tx, ty = self.fruits[claim[1]][:2]
-            d = math.hypot(tx - m["x"], ty - m["y"])
-            if claim != m["target"]:
-                m["target"], m["target_d"], m["target_tick"] = claim, d, self.tick
-            elif d < m["target_d"] - 5:
-                m["target_d"], m["target_tick"] = d, self.tick
-            elif self.tick - m["target_tick"] > STUCK_TICKS:  # not getting closer: drop it
-                self.fruits.pop(claim[1])
-                self.claims = {}
-                m["target"] = None
-            if m["target"] and d > 4:
-                m["fruit_tick"] = self.tick
-                rel = wrap(math.atan2(ty - m["y"], tx - m["x"]) - m["h"])
-                m["mode"] = "tofruit"
-                return min(speed, d - 2), rel, rel if abs(rel) > 0.5 else 0.0
+    def _go_to_claim(self, a, m):
+        """Walk to the world-map fruit assigned to us; drop it if we stop getting closer."""
+        claim = self.claims.get(a["agent_id"])
+        if not claim:
+            return None
+        tx, ty = self.fruits[claim[1]][:2]
+        d = math.hypot(tx - m["x"], ty - m["y"])
+        if claim != m["target"]:
+            m["target"], m["target_d"], m["target_tick"] = claim, d, self.tick
+        elif d < m["target_d"] - 5:
+            m["target_d"], m["target_tick"] = d, self.tick
+        elif self.tick - m["target_tick"] > STUCK_TICKS:
+            self.fruits.pop(claim[1])
+            self.claims = {}
+            m["target"] = None
+        if not m["target"] or d <= 4:
+            return None
+        m["fruit_tick"] = self.tick
+        rel = wrap(math.atan2(ty - m["y"], tx - m["x"]) - m["h"])
+        m["mode"] = "tofruit"
+        return min(a["speed"], d - 2), rel, rel if abs(rel) > 0.5 else 0.0
 
-        # 5. stay where trees are; relocate only if none within reach; keep the colony spread out
+    def _forage(self, a, m, obs, edges):
+        """Stay where trees are, keep the colony spread out, relocate or explore when the patch is quiet."""
         if m["err"] <= LOC_OK:
-            near_tree = any(math.hypot(tr[0] - m["x"], tr[1] - m["y"]) < NEAR_TREE for tr in self.trees)
-            crowd = [(math.hypot(om["x"] - m["x"], om["y"] - m["y"]), oid) for oid, om in self.mem.items()
-                     if oid != a["agent_id"] and om["err"] <= LOC_OK and om["mode"] in ("sit", "scan", "")]
-            d_crowd, oid = min(crowd) if crowd else (1e9, None)
-            richer = oid is not None and (self.energy[oid], -oid) < (a["energy"], -a["agent_id"])
-            if d_crowd < SPREAD_DIST and richer and a["energy"] > HOP_MIN_ENERGY and self.tick >= m["hop_until"]:
-                om = self.mem[oid]
-                m["hop_until"] = self.tick + 15
-                m["hop_dir"] = math.atan2(m["y"] - om["y"], m["x"] - om["x"]) + self.rng.uniform(-0.4, 0.4)
-            if self.tick < m["hop_until"]:
-                m["mode"] = "spread"
-                return self._walk(a, m, edges)
-            if near_tree and self.tick - m["fruit_tick"] < HOP_AFTER:
-                pass
-            else:
-                best = None
-                for tr in self.trees:
-                    d = math.hypot(tr[0] - m["x"], tr[1] - m["y"])
-                    if d > HOME_REACH or (near_tree and d < NEAR_TREE):
-                        continue  # (this patch has gone quiet: look further afield)
-                    if any(math.hypot(tr[0] - om["x"], tr[1] - om["y"]) < SPREAD_DIST for oid, om in self.mem.items()
-                           if oid != a["agent_id"] and om["err"] <= LOC_OK):
-                        continue
-                    score = d + (0 if self.tick - tr[3] < FRUITING_TTL else 100)
-                    if best is None or score < best[0]:
-                        best = (score, tr)
-                if best:
-                    tx, ty = best[1][0], best[1][1]
-                    d = math.hypot(tx - m["x"], ty - m["y"])
-                    rel = wrap(math.atan2(ty - m["y"], tx - m["x"]) - m["h"])
-                    m["fruit_tick"] = self.tick
-                    m["mode"] = "totree"
-                    return min(speed, d - 15), rel, rel if abs(rel) > 0.5 else 0.0
+            r = self._keep_spread(a, m, edges) or self._relocate_to_tree(a, m)
+            if r:
+                return r
         if self.tick < m["hop_until"]:
             m["mode"] = "hop"
             return self._walk(a, m, edges)
         if self.tick - m["fruit_tick"] > HOP_AFTER and a["energy"] > HOP_MIN_ENERGY:
-            if m["err"] <= LOC_OK:  # head for the stalest nearby grid cell
-                best = None
-                for i in range(W // CELL + 1):
-                    for j in range(H // CELL + 1):
-                        cx, cy = min(i * CELL + CELL / 2, W - 60), min(j * CELL + CELL / 2, H - 60)
-                        d = math.hypot(cx - m["x"], cy - m["y"])
-                        if d < 100 or d > 600:
-                            continue
-                        stale = self.tick - self.cell_seen.get((i, j), -10**6)
-                        score = d - min(stale, 2000) * 0.3
-                        if best is None or score < best[0]:
-                            best = (score, cx, cy)
-                if best:
-                    m["hop_dir"] = math.atan2(best[2] - m["y"], best[1] - m["x"])
-                    m["hop_until"] = self.tick + int(math.hypot(best[1] - m["x"], best[2] - m["y"]) / speed)
-                    m["fruit_tick"] = self.tick
-                    m["mode"] = "hop"
-                    return self._walk(a, m, edges)
-            self._start_hop(a, m, obs)  # unlocalized: relocate blindly
-            m["mode"] = "hop"
-            return self._walk(a, m, edges)
+            return self._explore(a, m, obs, edges)
+        return None
 
-        # 6. sit, scanning periodically
+    def _keep_spread(self, a, m, edges):
+        """If a poorer idle agent sits within SPREAD_DIST, the richer one walks away for 15 ticks."""
+        crowd = [(math.hypot(om["x"] - m["x"], om["y"] - m["y"]), oid) for oid, om in self.mem.items()
+                 if oid != a["agent_id"] and om["err"] <= LOC_OK and om["mode"] in ("sit", "scan", "")]
+        d_crowd, oid = min(crowd) if crowd else (1e9, None)
+        richer = oid is not None and (self.energy[oid], -oid) < (a["energy"], -a["agent_id"])
+        if d_crowd < SPREAD_DIST and richer and a["energy"] > HOP_MIN_ENERGY and self.tick >= m["hop_until"]:
+            om = self.mem[oid]
+            m["hop_until"] = self.tick + 15
+            m["hop_dir"] = math.atan2(m["y"] - om["y"], m["x"] - om["x"]) + self.rng.uniform(-0.4, 0.4)
+        if self.tick < m["hop_until"]:
+            m["mode"] = "spread"
+            return self._walk(a, m, edges)
+        return None
+
+    def _relocate_to_tree(self, a, m):
+        """No tree nearby (or the patch went quiet): walk to the best unoccupied tree within reach."""
+        near_tree = any(math.hypot(tr[0] - m["x"], tr[1] - m["y"]) < NEAR_TREE for tr in self.trees)
+        if near_tree and self.tick - m["fruit_tick"] < HOP_AFTER:
+            return None
+        best = None
+        for tr in self.trees:
+            d = math.hypot(tr[0] - m["x"], tr[1] - m["y"])
+            if d > HOME_REACH or (near_tree and d < NEAR_TREE):
+                continue
+            if any(math.hypot(tr[0] - om["x"], tr[1] - om["y"]) < SPREAD_DIST for oid, om in self.mem.items()
+                   if oid != a["agent_id"] and om["err"] <= LOC_OK):
+                continue
+            score = d + (0 if self.tick - tr[3] < FRUITING_TTL else 100)
+            if best is None or score < best[0]:
+                best = (score, tr)
+        if not best:
+            return None
+        tx, ty = best[1][0], best[1][1]
+        d = math.hypot(tx - m["x"], ty - m["y"])
+        rel = wrap(math.atan2(ty - m["y"], tx - m["x"]) - m["h"])
+        m["fruit_tick"] = self.tick
+        m["mode"] = "totree"
+        return min(a["speed"], d - 15), rel, rel if abs(rel) > 0.5 else 0.0
+
+    def _explore(self, a, m, obs, edges):
+        """Nothing known nearby: localized agents head for the stalest grid cell, others hop blindly."""
+        if m["err"] <= LOC_OK:
+            best = None
+            for i in range(W // CELL + 1):
+                for j in range(H // CELL + 1):
+                    cx, cy = min(i * CELL + CELL / 2, W - 60), min(j * CELL + CELL / 2, H - 60)
+                    d = math.hypot(cx - m["x"], cy - m["y"])
+                    if d < 100 or d > 600:
+                        continue
+                    stale = self.tick - self.cell_seen.get((i, j), -10**6)
+                    score = d - min(stale, 2000) * 0.3
+                    if best is None or score < best[0]:
+                        best = (score, cx, cy)
+            if best:
+                m["hop_dir"] = math.atan2(best[2] - m["y"], best[1] - m["x"])
+                m["hop_until"] = self.tick + int(math.hypot(best[1] - m["x"], best[2] - m["y"]) / a["speed"])
+                m["fruit_tick"] = self.tick
+                m["mode"] = "hop"
+                return self._walk(a, m, edges)
+        self._start_hop(a, m, obs)
+        m["mode"] = "hop"
+        return self._walk(a, m, edges)
+
+    def _sit(self, a, m, t):
+        """Sit still; start a scan on schedule; otherwise keep the cone on the nearest known predator."""
         m["next_scan"] -= 1
         if m["next_scan"] <= 0:
             alert = self.tick - self.last_predator_tick < 100
@@ -467,7 +500,7 @@ class Hivemind:
             m["mode"] = "scan"
             return 0.0, 0.0, a["vision_angle"]
         m["mode"] = "sit"
-        if m["err"] <= LOC_OK and self.predators:  # keep the cone on the nearest known predator
+        if m["err"] <= LOC_OK and self.predators:
             px, py, _ = min(self.predators, key=lambda q: math.hypot(q[0] - m["x"], q[1] - m["y"]))
             if math.hypot(px - m["x"], py - m["y"]) < 450:
                 rel = wrap(math.atan2(py - m["y"], px - m["x"]) - m["h"])
