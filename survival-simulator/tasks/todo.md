@@ -1,234 +1,102 @@
-# Task List — higher score via measurement, simplification, targeted fixes
+# Task List — stop agents running into obstacles
 
-Verification command for every task unless stated: `python evaluate.py` (12 seeds, prints mean / min / kills).
-Record every result in `tasks/results.md` (policy, commit hash, mean, min survival, kills, wall time).
+Verification commands: `python scratch/stuck.py <seed> <max_time>` (stuck fraction), `python evaluate.py`
+(12 seeds; use `scratch/run_detached.ps1` for long runs), `python tests/test_policy_equivalence.py`.
+Log every measurement in `tasks/results.md`.
 
-## Task 1: Evaluation harness upgrades
+## Task 1: Stuck metric
 
-**Description:** Make `evaluate.py` the single source of truth: select the controller by `--policy module:Class`
-(default `src.utils.controllers.hivemind_policy:Hivemind`), `--repeat N` to run each seed N times, default seeds
-1–12, and report kills (count of score drops) next to the eaten-energy penalty.
+**Description:** `scratch/stuck.py` runs the Hivemind on one seed with access to true simulator positions and
+counts, per tick and agent, "stuck" = commanded `move_distance > 0` but actual displacement < 1 px. Reports the
+stuck fraction of moving agent-ticks overall and per policy mode (`m["mode"]`), plus the longest stuck streak.
+Run on seeds 1, 3, 6 to t=1200 and record the baseline.
 
 **Acceptance criteria:**
-- [x] `python evaluate.py --policy src.utils.controllers.dummy_agent_policy:dummy` and `--policy ...:Hivemind` both run
-- [x] Output has one line per (seed, repeat) plus MEAN / MIN / total kills
-- [x] `--repeat 2` doubles the rows
+- [ ] Script prints overall and per-mode stuck fractions and the longest streak (ticks, mode)
+- [ ] Baseline row for seeds 1, 3, 6 in `tasks/results.md`
 
 **Verification:**
-- [x] Manual: run with `--seeds 1 2 --max-time 200` for both policies, check columns (`tests/test_evaluate.py` = ok)
+- [ ] `python scratch/stuck.py 3 1200` runs without error and reproduces the logged numbers within noise
 
 **Dependencies:** None
-**Files:** `evaluate.py`
+**Files:** `scratch/stuck.py`, `tasks/results.md`
 **Scope:** S
 
-## Task 2: Noise floor
+## Task 2: Heard-through-wall fruit
 
-**Description:** Run the current `Hivemind` twice on seeds 1–12 (`--repeat 2`) and record the per-seed spread and
-the difference between the two means. This is the threshold a change must beat.
+**Description:** For localized agents (`err <= LOC_OK`), replace the cone-only `_blocked()` test in `_eat` and in
+`_record_sightings` with `_blocked_abs()` against nearby landmarks (exact geometry, any direction). When the chosen
+fruit is heard but not seen (`distance < hearing_radius`) and `|angle| > 0.6`, turn toward it before walking so the
+cone covers the path. Unlocalized agents keep the current behaviour.
 
 **Acceptance criteria:**
-- [ ] `tasks/results.md` created with both runs and a stated threshold (e.g. "a change must beat the mean by > X")
+- [ ] `eat` share of stuck ticks drops by ≥ 50 % on seeds 1, 3, 6
+- [ ] 12-seed mean survival and kills not worse than baseline beyond noise
 
 **Verification:**
-- [ ] Manual: numbers present in `tasks/results.md`
+- [ ] `python scratch/stuck.py 3 1200`; `python evaluate.py` (12 seeds); rows in `tasks/results.md`
 
 **Dependencies:** Task 1
-**Files:** `tasks/results.md`
-**Scope:** XS
+**Files:** `src/utils/controllers/hivemind_policy.py`
+**Scope:** S
 
-## Task 3: Reconstruct version 3 as `simple_policy.py`
+## Task 3: Stuck detector and target blacklist
 
-**Description:** Rebuild the ~200-line local policy that scored 1178/617 (per-agent frame, dead-reckoned multi-tree
-memory with merging, fruiting flag, camp/hop, sprint hysteresis at 92/110 px, soft-capped old-age dumps, newborn scan)
-from the session history, plus the one bug fix learned since: never spawn while fleeing. Same `decide(step)` interface.
+**Description:** In `decide`, remember the position estimate before `_fix_pose` runs next tick. If the fix moves the
+estimate back by ≥ 60 % of the biome-adjusted commanded move for 5 consecutive ticks, the agent is stuck: drop its
+current claim/tree target, blacklist that target position for 200 ticks (`m["blacklist"]`), and start a 15-tick hop
+perpendicular to the nearest landmark edge. Replaces the 40-tick timer in `_go_to_claim`.
 
 **Acceptance criteria:**
-- [x] `src/utils/controllers/simple_policy.py` ≤ 250 lines, no localization / shared map
-- [x] Runs to completion on seeds 1–3 without exceptions
+- [ ] Longest stuck streak on seeds 1, 3, 6 ≤ 10 ticks
+- [ ] No stuck flags in swamp/river when actually moving (checked in `scratch/stuck.py` by biome)
+- [ ] 12-seed mean survival and kills not worse than baseline beyond noise
 
 **Verification:**
-- [x] `python evaluate.py --policy src.utils.controllers.simple_policy:Hivemind --seeds 1 2 3`
+- [ ] `python scratch/stuck.py 3 1200`; `python evaluate.py`; rows in `tasks/results.md`
 
 **Dependencies:** Task 1
-**Files:** `src/utils/controllers/simple_policy.py`
-**Scope:** M
+**Files:** `src/utils/controllers/hivemind_policy.py`
+**Scope:** S
 
-## Task 4: A/B — choose the base
+## Task 4: One-corner detour for absolute targets
 
-**Description:** Run both policies on seeds 1–12 and pick the base by mean survival with kills as tiebreaker; ties go
-to the simpler one. Commit both files with the numbers in the message.
+**Description:** In `_go_to_claim` and `_relocate_to_tree`, before walking straight at (tx, ty), test the segment
+with `_blocked_abs` against landmarks within 250 px. If blocked by edge E, steer for E's endpoint nearest the target,
+offset 15 px away from the edge, then re-evaluate next tick (one corner per tick, no route memory). Skip the target if
+both endpoints are also blocked.
 
 **Acceptance criteria:**
-- [ ] `tasks/results.md` has both rows; base named in `tasks/plan.md` Architecture Decisions
-- [ ] Git commit contains both policies and the numbers
+- [ ] `totree` + `tofruit` share of stuck ticks drops by ≥ 50 % on seeds 1, 3, 6
+- [ ] 12-seed mean survival and kills not worse than baseline beyond noise
 
 **Verification:**
-- [ ] `git log -1` shows the numbers
+- [ ] `python scratch/stuck.py 3 1200`; `python evaluate.py`; rows in `tasks/results.md`
 
-**Dependencies:** Tasks 2, 3
-**Files:** `tasks/results.md`, `tasks/plan.md`
-**Scope:** XS
+**Dependencies:** Task 1
+**Files:** `src/utils/controllers/hivemind_policy.py`
+**Scope:** S
 
 ## Checkpoint A
-- [ ] Noise floor known, base chosen by number, everything committed
-- [ ] Review with team before Phase 1
+- [ ] Overall stuck fraction down ≥ 70 % vs Task 1 baseline (seeds 1, 3, 6)
+- [ ] 12-seed `evaluate.py` mean / kills not worse than the committed baseline beyond noise
+- [ ] Tasks 2–4 each committed separately with their numbers
 
-## Task 5: One dispersal rule
+## Task 5: Wrap up
 
-**Description:** The base has up to three overlapping ways to spread agents (spread-from-crowd, blind hop, richest-
-leaves-shared-patch). Replace with a single rule: "if the nearest other agent is closer than D and I am the richer one,
-walk D px away from it" (or the equivalent in the local-frame base). Ablate: score must not drop below the floor.
-
-**Acceptance criteria:**
-- [ ] Exactly one dispersal code path; constants `HOP_*`, `SHARE_DIST`, `SPREAD_DIST` reduced to one
-- [ ] 12-seed mean within the noise floor of Checkpoint A (or better)
-
-**Verification:**
-- [ ] `python evaluate.py`; result row in `tasks/results.md`
-
-**Dependencies:** Task 4
-**Files:** chosen policy file
-**Scope:** S
-
-## Task 6: One targeting rule + tunables cleanup
-
-**Description:** Reduce fruit/tree targeting to: visible unblocked fruit → go; else (if shared map exists) claimed
-fruit within reach; else sit; relocate by one rule when nothing seen for `HOP_AFTER`. Remove the stuck/target
-bookkeeping if the ablation shows no loss. Remove the duplicated `SCAN_EVERY` definition.
+**Description:** Re-record the replay trajectory with the accepted policy, run all tests, log final numbers.
 
 **Acceptance criteria:**
-- [ ] No duplicate tunables; `_plan` has ≤ 5 tiers
-- [ ] 12-seed mean within the noise floor (or better)
+- [ ] `python tests/test_policy_equivalence.py record` then all three tests print ok
+- [ ] Final rows in `tasks/results.md`; commit
 
 **Verification:**
-- [ ] `python evaluate.py`; result row in `tasks/results.md`
+- [ ] `for t in tests/*.py: python $t`
 
-**Dependencies:** Task 5
-**Files:** chosen policy file
-**Scope:** M
-
-## Task 7: Ablate localization + shared map as a whole
-
-**Description:** If the base is `hivemind_policy.py`, add a module flag `USE_WORLD_MAP` that disables localization,
-world map, claims and terrain in one switch, and compare. Keep the subsystem only if it beats the floor; otherwise
-delete it (git keeps it).
-
-**Acceptance criteria:**
-- [ ] One flag toggles the subsystem; both settings scored on 12 seeds
-- [ ] Decision recorded in `tasks/results.md`; dead code deleted if it lost
-
-**Verification:**
-- [ ] `python evaluate.py` for both flag values
-
-**Dependencies:** Task 6
-**Files:** chosen policy file
-**Scope:** S (flag) / M (deletion)
-
-## Checkpoint B
-- [ ] Base ≤ 300 lines, score ≥ Checkpoint A, committed with numbers
-
-## Task 8: Kill post-mortem
-
-**Description:** Run `scratch/deaths.py` on seeds 1, 3, 6 to t=1200 with the Checkpoint B base and tabulate: first-
-seen distance, energy at first sight, could-sprint, mode before, biome, ticks fled, predators visible. Name the single
-largest cause with its share.
-
-**Acceptance criteria:**
-- [ ] Table + one-sentence conclusion in `tasks/results.md`
-
-**Verification:**
-- [ ] Manual read
-
-**Dependencies:** Checkpoint B
-**Files:** `scratch/deaths.py`, `tasks/results.md`
-**Scope:** XS
-
-## Task 9: Energy floor
-
-**Description:** An agent below `0.2·max_energy` cannot sprint and dies to any charge. Raise the spawn reserve so a
-parent never drops below `0.2·max + 120` (enough for one sprint escape), and make old-age dumps respect the same floor
-except when `aging` is confirmed.
-
-**Acceptance criteria:**
-- [ ] Post-mortem "could not sprint at first sight" share drops by half
-- [ ] 12-seed kills and mean improve beyond the floor
-
-**Verification:**
-- [ ] `python evaluate.py`; `scratch/deaths.py` on seed 3
-
-**Dependencies:** Task 8
-**Files:** chosen policy file
-**Scope:** XS
-
-## Task 10: Ambush reduction
-
-**Description:** Predators close 250→50 px in 13 ticks; a 30-tick scan cycle misses them. Set the scan interval from
-the expected predator count (`0.01·sim_time`): e.g. 40 ticks at t<500, 15 ticks at t>2000. If the base keeps
-landmarks, prefer sit spots within 15 px of an obstacle edge (halves the approach directions).
-
-**Acceptance criteria:**
-- [ ] Post-mortem "first seen < 60 px" share drops
-- [ ] 12-seed kills improve beyond the floor
-
-**Verification:**
-- [ ] `python evaluate.py`
-
-**Dependencies:** Task 9
-**Files:** chosen policy file
-**Scope:** S
-
-## Task 11: Terrain-aware flee (only if localization kept)
-
-**Description:** Keep the terrain map (biome per 40 px cell) and `_flee_dir` candidate scoring; verify on the duel
-harness (`scratch/duel.py`) that flee never enters river/swamp, then ablate on 12 seeds.
-
-**Acceptance criteria:**
-- [ ] All 12 duel cases survive with ≤ 120 energy spent
-- [ ] 12-seed kills not worse
-
-**Verification:**
-- [ ] `python scratch/duel.py`; `python evaluate.py`
-
-**Dependencies:** Task 10
-**Files:** chosen policy file, `scratch/duel.py`
-**Scope:** S
-
-## Checkpoint C
-- [ ] Kills < 15/run, mean survival up, committed with numbers
-
-## Task 12: Population cap from tree count
-
-**Description:** Replace the time-based `POP_CAP` schedule with a cap tied to the number of known (or, in the local
-base, recently seen) trees — capacity ≈ fruiting trees. Ablate.
-
-**Acceptance criteria:**
-- [ ] No-predator runs (`scratch/nopred.py`-style) reach ≥ 2500 s on seeds 2 and 4
-- [ ] 12-seed mean not worse
-
-**Verification:**
-- [ ] `python evaluate.py`; no-predator script
-
-**Dependencies:** Checkpoint C
-**Files:** chosen policy file
-**Scope:** S
-
-## Task 13: Ship
-
-**Description:** Wire `agent_server.py` to the chosen policy (module-level instance, `decide(step.dict())`). Run
-`simulation_server.py` twice against one running server to confirm reset on `sim_time` decrease; log `/predict`
-latency.
-
-**Acceptance criteria:**
-- [ ] Headless score ≈ server score on seed 1
-- [ ] Second game on the same server process starts from a clean state
-- [ ] Max `/predict` latency < 50 ms
-
-**Verification:**
-- [ ] Two terminals: `python agent_server.py`, then `python simulation_server.py` twice
-
-**Dependencies:** Checkpoint C
-**Files:** `agent_server.py`
+**Dependencies:** Checkpoint A
+**Files:** `scratch/trajectory_seed3_300s.pkl`, `tasks/results.md`
 **Scope:** XS
 
 ## Checkpoint: Complete
-- [ ] Final 12-seed numbers in `tasks/results.md`; tagged commit; server verified
+- [ ] Stuck fraction and 12-seed score both logged; agents no longer visibly run against obstacles in
+      `python local_playground.py`

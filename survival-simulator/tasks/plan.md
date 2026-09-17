@@ -1,88 +1,78 @@
-# Implementation Plan: Higher score via measurement, simplification, then targeted fixes
+# Implementation Plan: Stop agents running into obstacles
 
 ## Overview
-The controller (`src/utils/controllers/hivemind_policy.py`, 565 lines) scores the same as the 150-line version 3
-did (6-seed means 930–1180, all within the ~±120 noise band; run-to-run nondeterminism in the sim adds more).
-Two losses have been constant across every version: ~30 predator kills per run (`eaten −30…−77`) and late-game
-starvation. Plan: (0) make the score measurable, (1) pick the simpler of two bases by A/B and strip everything that
-doesn't pay, (2) fix predator kills with one measured change at a time, (3) late-game food, (4) ship.
+Agents visibly shove against obstacles. The simulator never blocks a move — `environment.py:541-552` rotates the
+requested direction in 10° steps until the step is clear, so an agent pushing at a wall slides along it, and in a
+concave spot (two obstacles touching, or an obstacle against the boundary) the alternating ±10° search makes it
+jitter in place. The controller (`src/utils/controllers/hivemind_policy.py`) makes this worse in four ways:
 
-Spec: `README.md` + `~/.claude/plans/read-the-readme-of-purring-wozniak.md` (mechanics extracted from code).
+1. `_blocked()` only knows edges inside the 60° vision cone, so fruit *heard* through a wall behind/beside the agent
+   is not filtered (`_eat`, line ~389) and the agent never turns toward heard fruit < 60 px (line ~401): it pushes
+   into the wall until the fruit rots (up to 50 s).
+2. `_relocate_to_tree` and `_go_to_claim` walk a straight line to an absolute target with no obstacle awareness.
+3. Only `_walk()` bounces off walls, and only off edges in the cone (`WALL_TURN_DIST`).
+4. Nothing detects "I'm not moving": dead-reckoning assumes the commanded move happened; the next landmark fix snaps
+   the estimate back; the loop repeats every tick. Only `_go_to_claim` has a 40-tick stuck timer.
+
+The learned landmark map (`self.landmarks`, exact absolute obstacle edges) makes all four fixable for localized
+agents without pathfinding: exact line-of-walk blockage tests (`_blocked_abs`), a stuck signal from the fix snap-back,
+and one-corner detours.
+
+Previous plan (measurement / simplification / predator kills) was discarded by the user on 2026-09-17; the harness
+(`evaluate.py`, 12 seeds, `--policy`, kills column) and `tests/test_policy_equivalence.py` from it remain the
+verification tools.
 
 ## Architecture Decisions
-- **One number to steer by:** 12 seeds (`1..12`), reported as mean / min survival / total kills. Two runs of the
-  same policy define the noise floor; a change counts only if it beats the floor.
-- **Ablation, not intuition:** every removal or addition is a flag or a separate module compared on the same
-  12 seeds. `evaluate.py --policy <module:Class>` selects the controller.
-- **Two candidate bases, measured:** `simple_policy.py` = reconstruction of version 3 (local tree memory, sprint
-  hysteresis, capped dumps; ~200 lines) vs current `hivemind_policy.py`. Whichever wins on 12 seeds is the base;
-  the other is kept in git for reference only.
-- **Keep what is verified and cheap:** the boundary/landmark localization is exact (1e-13 px) and ~60 lines; it
-  stays only if the ablation shows the shared map pays. Terrain map and obstacle geometry ride on it.
-- **Commit after each measured win** with the 12-seed numbers in the message; never lose a good version again.
+- **Measure first.** A scratch script with true simulator positions defines "stuck" (commanded move > 0, actual
+  displacement < 1 px) and reports the stuck fraction per mode. Every fix must move this number.
+- **Use what we have.** No pathfinding, no new data structures: `_blocked_abs` + landmark endpoints for detours,
+  the fix snap-back for stuck detection.
+- **Behaviour changes are measured twice:** stuck fraction (must drop) and `python evaluate.py` 12-seed mean /
+  kills (must not get worse beyond the ~±120 noise). The replay test is re-recorded after each accepted change.
+- **Unlocalized agents keep today's behaviour** (they cannot use landmarks); they are a minority after the first
+  minute.
 
 ## Dependency graph
 ```
-T1 harness (12 seeds, --policy, --repeat, kills column)
- ├── T2 noise floor
- ├── T3 reconstruct simple_policy.py ── T4 A/B choose base
- │                                          └── T5..T7 strip mechanisms (one ablation each)
- │                                                 └── Checkpoint B
- │                                                       ├── T8 kill post-mortem → T9/T10/T11 predator fixes
- │                                                       └── T12 late-game food
- │                                                             └── T13 ship (server wiring, latency, 3-run reset)
+T1 stuck metric (scratch/stuck.py)
+ ├── T2 heard-through-wall fruit (exact blockage) ─┐
+ ├── T3 stuck detector + target blacklist ─────────┼── Checkpoint A (stuck fraction, 12-seed score)
+ └── T4 one-corner detour for absolute targets ────┘
+        └── T5 re-record replay trajectory, commit
 ```
 
 ## Task List
 
-### Phase 0: Measurement
-- [x] Task 1: `evaluate.py` — `--policy module:Class`, `--repeat N`, 12-seed default, kills column
-- [ ] Task 2: Noise floor — run current policy twice on 12 seeds, record spread in `tasks/results.md`
-- [x] Task 3: Reconstruct version 3 as `src/utils/controllers/simple_policy.py`
-- [ ] Task 4: A/B simple vs hivemind on 12 seeds → choose base, commit both
+### Phase 1: Measure
+- [ ] Task 1: `scratch/stuck.py` — stuck fraction per mode on seeds 1, 3, 6 (baseline row in `tasks/results.md`)
+
+### Phase 2: Fixes (one ablation each, in order of expected impact)
+- [ ] Task 2: Heard-through-wall fruit — localized agents filter fruit and claims with `_blocked_abs`; turn toward
+      heard fruit before walking
+- [ ] Task 3: Stuck detector — landmark fix snaps position back ≥ 60 % of the commanded move for 5 ticks →
+      drop target/claim, blacklist it 200 ticks, hop perpendicular to the wall
+- [ ] Task 4: One-corner detour — when the straight line to a tree/fruit target crosses a landmark edge, aim for
+      the nearer endpoint (+15 px clearance) first
 
 ### Checkpoint A
-- [ ] `tasks/results.md` has noise floor + both bases; base chosen with a number, not a feeling
+- [ ] Stuck fraction down ≥ 70 % vs Task 1 baseline on the same seeds
+- [ ] 12-seed `evaluate.py` mean and kills not worse than the committed baseline beyond noise
+- [ ] Each fix committed separately with its numbers
 
-### Phase 1: Simplify the base (each task = one ablation; keep only if score does not drop below floor)
-- [ ] Task 5: Collapse the three dispersal rules (spread / hop / share-richest-leaves) into one
-- [ ] Task 6: Collapse target logic (claims / near-tree / stale-cell / stuck) into "nearest visible fruit, else sit,
-      else one relocation rule"; delete duplicate `SCAN_EVERY`
-- [ ] Task 7: Ablate localization + shared map as a whole (flag). Keep only if it beats the floor.
-
-### Checkpoint B
-- [ ] Base ≤ 300 lines, 12-seed score ≥ Checkpoint A base, committed
-
-### Phase 2: Predator kills (currently ~30/run; target < 15)
-- [ ] Task 8: Kill post-mortem on 3 seeds with `scratch/deaths.py` → one table: first-seen distance, energy,
-      could-sprint, mode, biome, ticks fled. Pick the top cause.
-- [ ] Task 9: Energy floor — never spawn below `0.2·max + 120`; sprint lock is death (14/24 kills couldn't sprint)
-- [ ] Task 10: Ambush reduction — scan interval from predator count (≈0.01·t) and, if base keeps landmarks, sit
-      with back to an obstacle edge
-- [ ] Task 11: Terrain-aware flee (river/swamp) — only if base keeps localization; else skip
-
-### Checkpoint C
-- [ ] Kills < 15/run on 12 seeds, mean survival up vs Checkpoint B, committed
-
-### Phase 3: Late-game food
-- [ ] Task 12: Population cap from observed tree count (capacity ≈ fruiting trees); ablate `POP_CAP` schedule
-
-### Phase 4: Ship
-- [ ] Task 13: Wire `agent_server.py` to the chosen policy; run `simulation_server.py` twice against one server
-      process (reset on `sim_time` decrease); `/predict` latency < 50 ms
+### Phase 3: Wrap up
+- [ ] Task 5: Re-record `scratch/trajectory_seed3_300s.pkl`, all tests green, results logged
 
 ### Checkpoint: Complete
-- [ ] 12-seed mean recorded in `tasks/results.md`; server end-to-end verified; final commit tagged
+- [ ] `tasks/results.md` has baseline + per-fix stuck fractions and 12-seed scores
 
 ## Risks and Mitigations
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| 12-seed runs take ~30–60 min per policy | Med | `--workers` = cores; run ablations in background; batch two ablations per run |
-| Version 3 reconstruction differs from the 1178 run | Low | It is a baseline, not a target; any faithful ~200-line local policy serves |
-| Sim nondeterminism hides 5 % gains | Med | Only chase changes expected to be worth ≥ 100 s (kills, starvation); accept ties as "simpler wins" |
-| Simplifying removes the thing that made late game work | Med | Ablate one mechanism per run; revert on drop |
-| Evaluation seeds differ from the hidden preset seeds | Low | 12 random seeds; never tune to a single seed |
+| Fix reduces stuck ticks but agents then wander more and eat less | Med | Score gate at Checkpoint A; keep detours to one corner, never long routes |
+| Stuck detector misfires on legitimate slow movement (swamp 0.5×, river 0.3×) | Med | Compare snap-back to the *biome-adjusted* commanded move |
+| Landmark map incomplete early in the game | Low | Falls back to today's cone-only behaviour when no landmark is near |
+| 12-seed runs are slow (~25–45 min) | Low | Use `scratch/run_detached.ps1` (one process per seed, `--workers 1`) |
 
 ## Open Questions
-- Team preference: keep iterating on `hivemind_policy.py` in parallel with this plan, or freeze it until
-  Checkpoint A? (Parallel edits will invalidate the A/B.)
+- None blocking. The simulator's deflection behaviour is fixed (evaluation uses the same code), so all fixes live in
+  the controller.
