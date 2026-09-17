@@ -58,3 +58,19 @@ is a matter of not sitting at the right trees (Task 7), not of not knowing where
 Same 3 seeds × 3 repeats: `simple_policy` (original plan) mean 900 (worst 632, 42–86 kills) vs `hivemind_policy` mean 1044
 (worst 859, 35–70 kills). User chose to serve the **original-plan `simple_policy`** anyway; `agent_server.py` and
 `local_playground.py`/`evaluate.py` default now point to it. `hivemind_policy.py` stays in the repo.
+
+### Learned evasion (2026-09-17): duel objective (`scratch/duel_env.py`, 300 fixed randomized 1-v-1 setups on seeds 1–12)
+
+Reward = −energy spent/100 per tick, −5 on death. Agent energy U(40,400), predator energy U(50,200), distance U(40,250).
+
+| Policy | mean reward | death rate | energy spent | note |
+|---|---|---|---|---|
+| served rule (simple_policy threat branch, current constants) | −2.096 | 28.3 % | 102.6 | baseline (600-duel run: −2.131 / 28.2 % / 98.0) |
+| rule, (1+22)-ES over 6 flee constants, 25 gens (`scratch/tune_flee.py`) | −2.039 | 26.7 % | 96.4 | plateau after gen 5: CHARGE_DIST=CHARGE_RELEASE=92, SEEN_ANGLE=2.36, FLEE_MEMORY=34 — rule shape is the limit, not the constants; **not adopted** (gain within duel noise of a rule change) |
+
+### Heuristic-first plan (2026-09-17): spread agents apart before any RL
+
+| Task | mean score | mean survived | min survived | kills/run | note |
+|---|---|---|---|---|---|
+| Task 0 baseline, served `simple_policy` + learned flee net (`flee_weights.npz` present) | 1164 | **1138** | 630 | 50.3 | reference for this plan |
+| Task 0 baseline, same policy with the hand flee rule (weights file removed) | 952 | 924 | 519 | 47.2 | net ON is +214 s; the net wiring is now committed |

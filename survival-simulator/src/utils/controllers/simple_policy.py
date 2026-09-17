@@ -1,10 +1,14 @@
 """Version-3 local policy (reconstruction). Per-agent dead-reckoned frame, local tree memory, no shared map.
 Priority: threat > eat visible fruit > reproduce > camp at a known tree > explore > scan."""
 import math
+import os
 import random
 from src.utils.DTOs import ActionRequest
+from src.utils.controllers import flee_net
 
 CHARGE_DIST, CHARGE_RELEASE = 92, 110   # sprint when a predator that sees us is inside 92 px, until it is past 110
+SEEN_DIST, SEEN_ANGLE = 60, math.pi / 6 + 0.15   # predator "sees us": inside its hearing radius or its vision cone
+FLEE_SPEED = 1.0                                 # back-away speed as a fraction of walk speed when not sprinting
 FLEE_MEMORY = 20
 CAMP_R = 12
 TREE_TTL, NO_FRUIT_GIVEUP, REVISIT, FRUITING_TTL = 600, 200, 600, 400
@@ -14,7 +18,8 @@ DUMP_OVERSHOOT = 4
 SCAN_EVERY, SCAN_EVERY_ALERT = [(0, 80), (1500, 30)], 20
 OLD_AGE, OLD_DUMP_ENERGY = 55, 250
 WALL_TURN_DIST = 45
-BIOME_PENALTY = {"swamp": 0.5, "desert": 0.8, "river": 0.3}
+BIOME_PENALTY = flee_net.BIOME_PENALTY
+FLEE_NET = flee_net.load() if os.path.exists(flee_net.WEIGHTS) else None   # learned evasion (scratch/train_flee.py); None = hand rule
 
 
 def interp(t, pts):
@@ -142,19 +147,25 @@ class Hivemind:
                     or (self.tick - v[2] > 2 and math.hypot(v[0] - m["x"], v[1] - m["y"]) < a["hearing_radius"] - 10)]:
             del m["trees"][key]
 
-        # 1. threat: face it, back away; sprint only inside the charge zone
+        # 1. threat: learned net (features from the closest predator, last known position while it is out of sight)
+        #    or the hand rule: face it, back away, sprint only inside the charge zone
         if preds:
             p = min(preds, key=lambda o: o["distance"])
             m["pred"], m["pred_tick"], self.last_predator_tick = self._world(m, p["distance"], p["angle"]), self.tick, self.tick
+            m["pred_rel"], m["scan_left"], m["mode"] = p["rel_dir"], 0, "flee"
+            if FLEE_NET is not None:
+                return flee_net.act(FLEE_NET, a, (p["distance"], p["angle"], p["rel_dir"]), True)
             fx = sum(-math.cos(o["angle"]) / max(o["distance"], 1.0) for o in preds)
             fy = sum(-math.sin(o["angle"]) / max(o["distance"], 1.0) for o in preds)
-            seen_by_it = p["distance"] < 60 or abs(p["rel_dir"]) < math.pi / 6 + 0.15
+            seen_by_it = p["distance"] < SEEN_DIST or abs(p["rel_dir"]) < SEEN_ANGLE
             m["sprinting"] = seen_by_it and p["distance"] < (CHARGE_RELEASE if m["sprinting"] else CHARGE_DIST) and can_sprint
-            m["scan_left"], m["mode"] = 0, "flee"
-            return (sprint if m["sprinting"] else speed), math.atan2(fy, fx), p["angle"]
+            return (sprint if m["sprinting"] else speed * FLEE_SPEED), math.atan2(fy, fx), p["angle"]
         if m["pred"] and self.tick - m["pred_tick"] < FLEE_MEMORY:
             m["mode"] = "flee_mem"
-            return speed, wrap(self._rel_angle(m, m["pred"]) + math.pi), 0.0
+            rel = self._rel_angle(m, m["pred"])
+            if FLEE_NET is not None:
+                return flee_net.act(FLEE_NET, a, (math.hypot(m["pred"][0] - m["x"], m["pred"][1] - m["y"]), rel, m["pred_rel"]), False)
+            return speed, wrap(rel + math.pi), 0.0
 
         # 2. eat (ignore fruit we only hear through a wall); dying agents don't walk
         fruits = [f for f in fruits if not self._blocked(f["distance"], f["angle"], edges)]
