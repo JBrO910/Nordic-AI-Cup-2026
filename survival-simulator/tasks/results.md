@@ -52,3 +52,9 @@ is a matter of not sitting at the right trees (Task 7), not of not knowing where
 | Task 10 early cap 16 | 1007 | 983 | 606 | 52.0 | **rejected**: −159 s vs Task 7; 24 skipped (dominated). Cap stays at 12. |
 
 **Final policy = Task 7 state (commit with "grove preference"): 12-seed mean survived 1142 s, min 837 s, 44.5 kills/run.**
+
+### Served policy decision (2026-09-17)
+
+Same 3 seeds × 3 repeats: `simple_policy` (original plan) mean 900 (worst 632, 42–86 kills) vs `hivemind_policy` mean 1044
+(worst 859, 35–70 kills). User chose to serve the **original-plan `simple_policy`** anyway; `agent_server.py` and
+`local_playground.py`/`evaluate.py` default now point to it. `hivemind_policy.py` stays in the repo.

@@ -8,7 +8,7 @@ import argparse, importlib, random, time
 from multiprocessing import Pool
 
 DEFAULT_SEEDS = list(range(1, 13))
-DEFAULT_POLICY = "src.utils.controllers.hivemind_policy:Hivemind"
+DEFAULT_POLICY = "src.utils.controllers.simple_policy:Hivemind"
 
 
 def load_policy(spec, seed):
