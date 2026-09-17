@@ -4,7 +4,8 @@ Every agent is localized in absolute map coordinates: a sighting of a boundary w
 edges >= 1000 px long) gives exact heading + position; localized agents localize the agents they see.
 All sightings feed one shared world map (fruits, trees, predators) that every agent plans against.
 
-Per agent priority: threat > visible fruit > assigned world fruit > fruiting tree > sit & scan (hop if starving).
+Per agent priority (see _plan): flee predators > eat visible fruit > finish a scan > walk to the claimed map
+fruit > forage (stay near trees, keep spread out, relocate/explore when the patch is quiet) > sit and scan.
 """
 import math
 import random
@@ -26,7 +27,6 @@ HOP_AFTER = 150          # ticks without seeing fruit -> go somewhere else
 CELL = 300               # exploration grid cell size
 HOP_TICKS = 20           # length of a hop (x walk speed = distance)
 HOP_MIN_ENERGY = 40
-SHARE_DIST = 40          # another agent this close = we share a patch
 WALL_TURN_DIST = 45
 LOC_OK = 12              # position error (px) below which we trust the absolute estimate
 FRUIT_REACH = 200        # walk to a known fruit up to this far
@@ -98,7 +98,7 @@ class Hivemind:
         self.fruits = []      # [x, y, last_seen]
         self.trees = []       # [x, y, last_seen, fruit_seen]
         self.predators = []   # [x, y, last_seen]
-        self.claims = {}      # agent_id -> ("fruit"|"tree", index)
+        self.claims = {}      # agent_id -> index into self.fruits
         self.landmarks = {}   # round(edge length, 4) -> [(ax1, ay1, ax2, ay2), ...]
         self.cell_seen = {}   # (i, j) -> tick a localized agent last stood in that cell
         self.terrain = {}     # (x//40, y//40) -> biome name, learned from localized agents' own biome
@@ -292,8 +292,7 @@ class Hivemind:
         return rec
 
     def _assign(self, agents):
-        """Fruit: greedy nearest-first, one per agent, short reach. Home: a sticky tree per agent,
-        spaced out so the colony forms a lattice of scanners."""
+        """Claim map fruit for localized, non-dying agents: greedy nearest-first, one fruit per agent."""
         self.claims = {}
         loc = [(a, self.mem[a["agent_id"]]) for a in agents
                if self.mem[a["agent_id"]]["err"] <= LOC_OK and not self.mem[a["agent_id"]]["aging"]]
@@ -303,7 +302,7 @@ class Hivemind:
         for d, aid, i in pairs:
             if d > FRUIT_REACH or aid in self.claims or i in taken:
                 continue
-            self.claims[aid] = ("fruit", i)
+            self.claims[aid] = i
             taken.add(i)
 
     # ---------------- reproduction ----------------
@@ -414,19 +413,19 @@ class Hivemind:
     def _go_to_claim(self, a, m):
         """Walk to the world-map fruit assigned to us; drop it if we stop getting closer."""
         claim = self.claims.get(a["agent_id"])
-        if not claim:
+        if claim is None:
             return None
-        tx, ty = self.fruits[claim[1]][:2]
+        tx, ty = self.fruits[claim][:2]
         d = math.hypot(tx - m["x"], ty - m["y"])
         if claim != m["target"]:
             m["target"], m["target_d"], m["target_tick"] = claim, d, self.tick
         elif d < m["target_d"] - 5:
             m["target_d"], m["target_tick"] = d, self.tick
         elif self.tick - m["target_tick"] > STUCK_TICKS:
-            self.fruits.pop(claim[1])
+            self.fruits.pop(claim)
             self.claims = {}
             m["target"] = None
-        if not m["target"] or d <= 4:
+        if m["target"] is None or d <= 4:
             return None
         m["fruit_tick"] = self.tick
         rel = wrap(math.atan2(ty - m["y"], tx - m["x"]) - m["h"])
