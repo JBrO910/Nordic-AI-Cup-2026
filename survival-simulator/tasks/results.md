@@ -85,3 +85,18 @@ Reward = −energy spent/100 per tick, −5 on death. Agent energy U(40,400), pr
 at most ~+20 s. Time goes to walking between trees and camping at fruitless ones; the local frame's drift makes long
 relocations (grove preference) lose. Eval noise is sd ≈ 330 s per seed, so any change under ~±70 s needs 24+ seeds to call.
 Final policy = Task 1 state: 24-seed mean survived 1124 s (baseline 1105).
+
+### Camp-time A/B (2026-09-18), 24 seeds, paired vs Task 1 (1124 s)
+
+Premise check (seeds 1–3, current policy): agents already eat ~90 % of fruit in t<300 (71–219 rot = 4–13 score points, the
+ceiling of any "early fruit rush"); first predator arrives by t≈100–150 in every seed; mean energy fill falls 47 % → 32 % →
+18 % over 0/300/600–900 s while pop drops 15 → 10. Fruit rush **not attempted**: a fruit is worth 0.02–0.06 points.
+
+| Variant | mean survived | Δ vs Task 1 | wins | min | note |
+|---|---|---|---|---|---|
+| A `NO_FRUIT_GIVEUP` 200 → 100 | 1081 | −42 ± 72 | 12/24 | 534 | **rejected** |
+| B leave a barren tree when a fruiting unvisited one is known | 1023 | −101 ± 77 | 9/24 | 646 | **rejected** |
+| A+B | 1053 | −70 ± 72 | 8/24 | 485 | **rejected** |
+
+Lesson: leaving trees sooner converts `camp` ticks into `totree` walking, which costs more than sitting. The local policy's
+camping patience (200 ticks) is already on the short side; if anything, try *longer* patience next.
