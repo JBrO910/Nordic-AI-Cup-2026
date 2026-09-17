@@ -155,3 +155,42 @@ Tasks 6–7: during that window raise `SPREAD_DIST` hops' threshold and `HOP_AFT
 ## Checkpoint B
 - [ ] Coverage at t=300 up, eaten/rotted ratio up, 12-seed mean not worse beyond noise
 - [ ] Tasks 6–8 each committed with numbers
+
+## Task 9: Predator-aware population cap
+
+**Description:** Replace the time-only `POP_CAP` lookup in `_choose_spawners` with `_pop_cap(t)`: 20 while no predator
+has been sighted and t < 250; 12 until a second distinct predator has been sighted (two entries in `self.predators`
+history ≥ 300 px apart, or two at once) or t ≥ 600; afterwards the existing schedule. Keep a small sighting history
+(`self.predator_log`, positions + ticks) so "distinct" is decidable. Unit test drives `_pop_cap` with synthetic
+sightings and times.
+
+**Acceptance criteria:**
+- [ ] `tests/test_pop_cap.py` passes (no sighting → 20; first sighting → 12; second distinct → schedule; t-fallbacks)
+- [ ] Peak population and coverage at t=300 up vs Phase 4 on seeds 1, 3, 6; kills/run not up beyond noise
+- [ ] 12-seed mean survival not worse than Phase 4 beyond noise
+
+**Verification:**
+- [ ] `python tests/test_pop_cap.py`; `python scratch/coverage.py 3`; `python evaluate.py`; rows in `tasks/results.md`
+
+**Dependencies:** Checkpoint B (Phase 4)
+**Files:** `src/utils/controllers/hivemind_policy.py`, `tests/test_pop_cap.py`
+**Scope:** S
+
+## Task 10: Early-cap schedule ablation
+
+**Description:** Run the 12-seed harness with the early cap at 16, 20 and 24 (module constant). Keep the best by mean
+survival with kills as tiebreaker; log all three rows.
+
+**Acceptance criteria:**
+- [ ] Three rows in `tasks/results.md`; chosen value committed with the numbers in the message
+
+**Verification:**
+- [ ] `python evaluate.py` ×3 (use `scratch/run_detached.ps1` + `scratch/collect.py`)
+
+**Dependencies:** Task 9
+**Files:** `src/utils/controllers/hivemind_policy.py`, `tasks/results.md`
+**Scope:** XS
+
+## Checkpoint C
+- [ ] Coverage at t=300 up vs Phase 4, kills not up beyond noise, 12-seed mean not worse
+- [ ] Tasks 9–10 committed with numbers

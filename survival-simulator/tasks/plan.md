@@ -105,3 +105,31 @@ Obstacle tasks (2–5) ──► T6 early survey ──► T7 grove preference �
 
 ### Checkpoint B
 - [ ] Coverage at t=300 up, eaten/rotted ratio up, 12-seed mean not worse beyond noise; each task its own commit.
+
+---
+
+# Phase 5 (appended 2026-09-17): predator-aware population cap
+
+## Findings that motivate it
+- `POP_CAP` is purely time-based (12 → 4). A sitting scanner covers ~125 k px² for 1 energy/s; 20 spread-out agents
+  cover the whole map, cheaper than walking. Early food (~200 energy/s map-wide) affords it.
+- Spawns are energy-gated (energy > 100 + reserve; child starts at 75), so a higher cap only pays together with the
+  existing cheap-breed rule (`RESERVE_FREE` when an unoccupied fruiting tree is known).
+- Predator spawn law: expected count ≈ 0.01·t; P(≥1) = 50 % at t≈120 s, 90 % at t≈215 s. Sightings live in
+  `self.predators`. Trigger the reduction on first sighting *or* t ≥ 250, whichever first.
+- There is no cull: "reduce" = stop breeding; the population declines through aging within ~2 min.
+- Risk: more agents → more kills (−energy/100 each, and a kill refuels the predator). Score gate catches it.
+
+## Dependency graph
+```
+Phase 4 (T6–T8) ──► T9 predator-aware cap ──► T10 schedule ablation ──► Checkpoint C
+```
+
+## Task List
+- [ ] Task 9: Predator-aware cap — `_pop_cap(t)`: 20 until first predator sighting or t ≥ 250; 12 until a second
+      distinct predator (two sightings ≥ 300 px apart) or t ≥ 600; then the current schedule. Unit-tested with
+      synthetic sightings. Metrics: peak population, coverage at t=300, kills, 12-seed score.
+- [ ] Task 10: Schedule ablation — early cap 16 / 20 / 24 on 12 seeds; keep the best, log all three.
+
+### Checkpoint C
+- [ ] Coverage at t=300 up vs Phase 4, kills not up beyond noise, 12-seed mean not worse; commits with numbers.
