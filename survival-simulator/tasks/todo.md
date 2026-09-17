@@ -7,16 +7,17 @@ Log every measurement in `tasks/results.md`.
 ## Task 1: Stuck metric
 
 **Description:** `scratch/stuck.py` runs the Hivemind on one seed with access to true simulator positions and
-counts, per tick and agent, "stuck" = commanded `move_distance > 0` but actual displacement < 1 px. Reports the
+counts, per tick and agent, "stuck" = commanded `move_distance > 0` but progress along the intended direction
+< 30 % of the biome-adjusted step (pushing on or sliding along an obstacle). Reports the
 stuck fraction of moving agent-ticks overall and per policy mode (`m["mode"]`), plus the longest stuck streak.
 Run on seeds 1, 3, 6 to t=1200 and record the baseline.
 
 **Acceptance criteria:**
-- [ ] Script prints overall and per-mode stuck fractions and the longest streak (ticks, mode)
-- [ ] Baseline row for seeds 1, 3, 6 in `tasks/results.md`
+- [x] Script prints overall and per-mode stuck fractions and the longest streak (ticks, mode)
+- [x] Baseline row for seeds 1, 3, 6 in `tasks/results.md`
 
 **Verification:**
-- [ ] `python scratch/stuck.py 3 1200` runs without error and reproduces the logged numbers within noise
+- [x] `python scratch/stuck.py 3 1200` runs without error and reproduces the logged numbers within noise
 
 **Dependencies:** None
 **Files:** `scratch/stuck.py`, `tasks/results.md`

@@ -44,7 +44,7 @@ T1 stuck metric (scratch/stuck.py)
 ## Task List
 
 ### Phase 1: Measure
-- [ ] Task 1: `scratch/stuck.py` — stuck fraction per mode on seeds 1, 3, 6 (baseline row in `tasks/results.md`)
+- [x] Task 1: `scratch/stuck.py` — stuck fraction per mode on seeds 1, 3, 6 (baseline row in `tasks/results.md`)
 
 ### Phase 2: Fixes (one ablation each, in order of expected impact)
 - [ ] Task 2: Heard-through-wall fruit — localized agents filter fruit and claims with `_blocked_abs`; turn toward

@@ -18,3 +18,11 @@ All rows: `python evaluate.py` unless noted. Score ≈ survived seconds; kills =
 ## 12-seed runs (seeds 1–12)
 
 (appended by Task 2 onward)
+
+## Obstacle-stuck plan (stuck = progress along intended direction < 30 % of the biome-adjusted step)
+
+| Policy / commit | seed | survived | stuck % of moving ticks | longest streak | top modes |
+|---|---|---|---|---|---|
+| baseline (v2.1 simplified, 8b4…) | 1 | 796 | 9.3 % | 333 (tofruit) | totree, tofruit, flee_mem |
+| baseline | 3 | 1200 | 9.5 % | 362 (totree) | totree 30 %, tofruit 12 % |
+| baseline | 6 | 1092 | 11.7 % | 178 (totree) | — |
