@@ -58,8 +58,12 @@ if __name__ == "__main__":
     p.add_argument("--max-time", type=float, default=3000)
     p.add_argument("--workers", type=int, default=None)
     a = p.parse_args()
-    with Pool(a.workers) as pool:
-        results = pool.map(run_seed, jobs(a.seeds, a.policy, a.max_time, a.repeat))
+    work = jobs(a.seeds, a.policy, a.max_time, a.repeat)
+    if a.workers == 1:  # in-process: safe for detached/hidden-console launches on Windows
+        results = [run_seed(w) for w in work]
+    else:
+        with Pool(a.workers) as pool:
+            results = pool.map(run_seed, work)
     for r in results:
         print(f"seed {r['seed']:>3} | score {r['score']:8.2f} | survived {r['survived']:7.1f}s | peak pop {r['peak_pop']:3d} "
               f"| preds {r['predators']:2d} | kills {r['kills']:3d} (-{r['eaten_penalty']:.1f}) | {r['wall']:.0f}s")
