@@ -100,11 +100,11 @@ Obstacle tasks (2–5) ──► T6 early survey ──► T7 grove preference �
       grid cell instead of sitting. Metric: known trees / real trees at t=300 (world-map coverage) + 12-seed score.
 - [x] Task 7: Grove preference — `_relocate_to_tree` scores candidates by fruiting trees within 120 px (recency
       weighted) minus distance. Metric: fruit eaten/rotted ratio + 12-seed score.
-- [ ] Task 8: Less early wandering — only if movement cost is still > 1 energy/s per agent for t < 300 after T6/T7:
+- [x] Task 8 (rejected by gate, reverted): Less early wandering — only if movement cost is still > 1 energy/s per agent for t < 300 after T6/T7:
       raise the spread threshold and hop patience during that window. Metric: cost-by-mode attribution + score.
 
 ### Checkpoint B
-- [ ] Coverage at t=300 up, eaten/rotted ratio up, 12-seed mean not worse beyond noise; each task its own commit.
+- [x] 12-seed mean up 987 → 1142 s (Task 7); T6 skipped (coverage already 76–83 %), T8 rejected.
 
 ---
 

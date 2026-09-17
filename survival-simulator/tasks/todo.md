@@ -136,7 +136,7 @@ spot stays the chosen tree. Unit test: three trees in a cluster beat one isolate
 **Files:** `src/utils/controllers/hivemind_policy.py`, `tests/test_grove.py`
 **Scope:** S
 
-## Task 8: Less early wandering (conditional)
+## Task 8: Less early wandering (conditional) — REJECTED (12-seed gate: survival 1142 → 975 s; see results.md)
 
 **Description:** Only if the cost-by-mode attribution still shows > 1 energy/s per agent of movement for t < 300 after
 Tasks 6–7: during that window raise `SPREAD_DIST` hops' threshold and `HOP_AFTER` patience. Skip (mark n/a) otherwise.
@@ -153,8 +153,8 @@ Tasks 6–7: during that window raise `SPREAD_DIST` hops' threshold and `HOP_AFT
 **Scope:** XS
 
 ## Checkpoint B
-- [ ] Coverage at t=300 up, eaten/rotted ratio up, 12-seed mean not worse beyond noise
-- [ ] Tasks 6–8 each committed with numbers
+- [x] Coverage at t=300 already 76–83 % (T6 skipped); 12-seed mean up 987 → 1142 s (T7); T8 rejected
+- [x] Tasks 6–8 each committed with numbers
 
 ## Task 9: Predator-aware population cap
 
