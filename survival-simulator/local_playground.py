@@ -1,15 +1,16 @@
 import pygame
 import random
+import sys
 from src.core import SimulationCore
-from src.utils.controllers.dummy_agent_policy import action_decision
+from evaluate import load_policy, DEFAULT_POLICY
 
-def local_simulation(verbose=True):
-    seed = None
+def local_simulation(verbose=True, policy=DEFAULT_POLICY, seed=None):
+    """policy: 'module:Class' (see evaluate.py), e.g. src.utils.controllers.dummy_agent_policy:dummy"""
     if seed is None: # If no seed is provided, generate a random one
         seed = random.randint(0, 2**32 - 1)
 
     sim = SimulationCore(seed=seed)
-    action_rng = random.Random(seed) # Deterministic actions. Can be removed if action_decision is deterministic
+    decide = load_policy(policy, seed)
 
     pygame.init()
     screen, clock = None, None
@@ -33,11 +34,7 @@ def local_simulation(verbose=True):
                     running = False
 
         state = sim.step(actions)
-        
-        actions = []
-        for agent, agent_state in zip(sim.env.agents, state["observations"]):
-            action = action_decision(agent_state, action_rng)
-            actions.append((agent.agent_id, action))
+        actions = decide(state)
 
         if verbose:
             sim.env.draw(screen)
@@ -57,4 +54,6 @@ def local_simulation(verbose=True):
     pygame.quit()
 
 if __name__ == "__main__":
-    local_simulation(verbose=True)
+    # python local_playground.py [module:Class] [seed]
+    local_simulation(verbose=True, policy=sys.argv[1] if len(sys.argv) > 1 else DEFAULT_POLICY,
+                     seed=int(sys.argv[2]) if len(sys.argv) > 2 else None)
