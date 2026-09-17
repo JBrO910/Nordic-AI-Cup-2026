@@ -43,11 +43,11 @@ memory with merging, fruiting flag, camp/hop, sprint hysteresis at 92/110 px, so
 from the session history, plus the one bug fix learned since: never spawn while fleeing. Same `decide(step)` interface.
 
 **Acceptance criteria:**
-- [ ] `src/utils/controllers/simple_policy.py` ≤ 250 lines, no localization / shared map
-- [ ] Runs to completion on seeds 1–3 without exceptions
+- [x] `src/utils/controllers/simple_policy.py` ≤ 250 lines, no localization / shared map
+- [x] Runs to completion on seeds 1–3 without exceptions
 
 **Verification:**
-- [ ] `python evaluate.py --policy src.utils.controllers.simple_policy:Hivemind --seeds 1 2 3`
+- [x] `python evaluate.py --policy src.utils.controllers.simple_policy:Hivemind --seeds 1 2 3`
 
 **Dependencies:** Task 1
 **Files:** `src/utils/controllers/simple_policy.py`
