@@ -47,7 +47,7 @@ T1 stuck metric (scratch/stuck.py)
 - [x] Task 1: `scratch/stuck.py` — stuck fraction per mode on seeds 1, 3, 6 (baseline row in `tasks/results.md`)
 
 ### Phase 2: Fixes (one ablation each, in order of expected impact)
-- [ ] Task 2: Heard-through-wall fruit — localized agents filter fruit and claims with `_blocked_abs`; turn toward
+- [x] Task 2 (rejected by gate, reverted): Heard-through-wall fruit — localized agents filter fruit and claims with `_blocked_abs`; turn toward
       heard fruit before walking
 - [x] Task 3: Stuck detector — landmark fix snaps position back ≥ 60 % of the commanded move for 5 ticks →
       drop target/claim, blacklist it 200 ticks, hop perpendicular to the wall
@@ -55,9 +55,9 @@ T1 stuck metric (scratch/stuck.py)
       the nearer endpoint (+15 px clearance) first
 
 ### Checkpoint A
-- [ ] Stuck fraction down ≥ 70 % vs Task 1 baseline on the same seeds
-- [ ] 12-seed `evaluate.py` mean and kills not worse than the committed baseline beyond noise
-- [ ] Each fix committed separately with its numbers
+- [x] Stuck fraction down ≥ 70 % vs Task 1 baseline on the same seeds (Task 3: 47/68/79 %)
+- [x] 12-seed `evaluate.py` mean and kills not worse than the committed baseline beyond noise
+- [x] Each fix committed separately with its numbers
 
 ### Phase 3: Wrap up
 - [ ] Task 5: Re-record `scratch/trajectory_seed3_300s.pkl`, all tests green, results logged

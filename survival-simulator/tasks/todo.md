@@ -23,7 +23,7 @@ Run on seeds 1, 3, 6 to t=1200 and record the baseline.
 **Files:** `scratch/stuck.py`, `tasks/results.md`
 **Scope:** S
 
-## Task 2: Heard-through-wall fruit
+## Task 2: Heard-through-wall fruit — REJECTED (12-seed gate: survival 987 → 781 s; see results.md)
 
 **Description:** For localized agents (`err <= LOC_OK`), replace the cone-only `_blocked()` test in `_eat` and in
 `_record_sightings` with `_blocked_abs()` against nearby landmarks (exact geometry, any direction). When the chosen
@@ -79,9 +79,9 @@ both endpoints are also blocked.
 **Scope:** S
 
 ## Checkpoint A
-- [ ] Overall stuck fraction down ≥ 70 % vs Task 1 baseline (seeds 1, 3, 6)
-- [ ] 12-seed `evaluate.py` mean / kills not worse than the committed baseline beyond noise
-- [ ] Tasks 2–4 each committed separately with their numbers
+- [x] Overall stuck fraction down ≥ 70 % vs Task 1 baseline (seeds 1, 3, 6) — 47/68/79 % with Task 3 alone (Tasks 2, 4 rejected)
+- [x] 12-seed `evaluate.py` mean / kills not worse than the committed baseline beyond noise (987 vs 997 s; 46.9 vs 49.4 kills)
+- [x] Tasks 2–4 each committed separately with their numbers
 
 ## Task 5: Wrap up
 

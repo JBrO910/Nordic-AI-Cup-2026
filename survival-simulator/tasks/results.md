@@ -34,3 +34,4 @@ All rows: `python evaluate.py` unless noted. Score ≈ survived seconds; kills =
 | baseline v2.1 simplified (HEAD before Task 4) | 1025 | 997 | 569 | 49.4 | reference |
 | Task 4 one-corner detour | 782 | 753 | 508 | 28.1 | **rejected**: stuck 9–12 % → 6–7 %, but survival −245 s; 47 % of steer calls diverted, 19 % gave the target up (corner oscillation on adjacent edges) |
 | Task 3 stuck detector + blacklist | 1009 | 987 | 726 | 46.9 | **accepted**: stuck 9.3/9.5/11.7 % → 4.9/3.0/2.4 % (seeds 1/3/6), longest streak 333/362/178 → 156 (eat)/38/14 |
+| Task 2 wall-aware fruit filter | 813 | 781 | 370 | 26.6 | **rejected**: eat-stuck → 0 % but survival −206 s. Lesson (also explains Task 4): the sim's 10°-step deflection slides agents around obstacles for free, so a straight line crossing an edge is usually still reachable; dropping such targets starves the colony. Only real non-progress (Task 3 snap-back) should trigger a give-up. |
