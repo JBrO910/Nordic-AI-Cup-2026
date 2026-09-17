@@ -1,5 +1,5 @@
 """Version-3 local policy (reconstruction). Per-agent dead-reckoned frame, local tree memory, no shared map.
-Priority: threat > eat visible fruit > reproduce > camp at a known tree > explore > scan."""
+Priority: threat > eat visible fruit > reproduce > spread from a crowd > camp at a known tree > explore > scan."""
 import math
 import os
 import random
@@ -18,6 +18,8 @@ DUMP_OVERSHOOT = 4
 SCAN_EVERY, SCAN_EVERY_ALERT = [(0, 80), (1500, 30)], 20
 OLD_AGE, OLD_DUMP_ENERGY = 55, 250
 WALL_TURN_DIST = 45
+SPREAD_DIST, HOP_TICKS, HOP_MIN_ENERGY = 110, 15, 120   # idle agents keep apart: the richer one walks a committed leg away
+TAKEN_R = 40                                             # a tree with another agent this close to it is not a camping target
 BIOME_PENALTY = flee_net.BIOME_PENALTY
 FLEE_NET = flee_net.load() if os.path.exists(flee_net.WEIGHTS) else None   # learned evasion (scratch/train_flee.py); None = hand rule
 
@@ -56,7 +58,7 @@ class Hivemind:
         self.reset()
 
     def reset(self):
-        self.mem, self.tick, self.last_time, self.last_predator_tick = {}, 0, -1.0, -10**9
+        self.mem, self.energy, self.tick, self.last_time, self.last_predator_tick = {}, {}, 0, -1.0, -10**9
 
     def _mem(self, aid):
         m = self.mem.get(aid)
@@ -64,7 +66,7 @@ class Hivemind:
             m = self.mem[aid] = dict(x=0.0, y=0.0, h=0.0, trees={}, target=None, camp_fruit_tick=self.tick,
                                      pred=None, pred_tick=-10**9, scan_left=5, next_scan=self.rng.randint(20, 60),
                                      explore_dir=self.rng.uniform(-math.pi, math.pi), prev_energy=None,
-                                     expected_drop=0.0, aging=False, wall_cooldown=0, sprinting=False, mode="")
+                                     expected_drop=0.0, aging=False, wall_cooldown=0, sprinting=False, mode="", hop_until=0)
         return m
 
     def decide(self, step):
@@ -74,6 +76,7 @@ class Hivemind:
         self.last_time, self.tick = t, self.tick + 1
         agents = step["agent_status"]
         alive = {a["agent_id"] for a in agents}
+        self.energy = {a["agent_id"]: a["energy"] for a in agents}
         for aid in list(self.mem):
             if aid not in alive:
                 del self.mem[aid]
@@ -189,12 +192,30 @@ class Hivemind:
             m["scan_left"], m["mode"] = math.ceil(2 * math.pi / a["vision_angle"]) - 1, "scan"
             return 0.0, 0.0, a["vision_angle"]
 
-        # 4. camp at a known tree (fruiting ones first), rotate when it stops giving
+        # 4. spread: an idle neighbour inside SPREAD_DIST makes the richer of the two walk a committed leg away
+        #    and give its tree up for REVISIT ticks (mirrors hivemind_policy._keep_spread without the shared map)
+        others = [o for o in obs if o["type"] == "Agent" and o["distance"] < SPREAD_DIST]
+        if others and a["energy"] > HOP_MIN_ENERGY and self.tick >= m["hop_until"]:
+            o = min(others, key=lambda o: o["distance"])
+            if (self.energy.get(o["id"], 0), -o["id"]) < (a["energy"], -a["agent_id"]):
+                ax = sum(math.cos(o["angle"]) for o in others)
+                ay = sum(math.sin(o["angle"]) for o in others)
+                m["hop_until"] = self.tick + HOP_TICKS
+                m["explore_dir"] = m["h"] + math.atan2(-ay, -ax) + self.rng.uniform(-0.4, 0.4)
+                if m["target"] in m["trees"]:
+                    tx, ty, seen, visit, fr = m["trees"][m["target"]]
+                    m["trees"][m["target"]] = (tx, ty, seen, self.tick, fr)
+                m["target"] = None
+        hopping = self.tick < m["hop_until"]
+
+        # 5. camp at a known tree (fruiting, unoccupied ones first), rotate when it stops giving
         if m["target"] not in m["trees"]:
             m["target"] = None
-        if m["target"] is None:
+        if m["target"] is None and not hopping:
+            taken = [self._world(m, o["distance"], o["angle"]) for o in obs if o["type"] == "Agent"]
             cands = [(self.tick - v[4] > FRUITING_TTL, math.hypot(v[0] - m["x"], v[1] - m["y"]), k)
-                     for k, v in m["trees"].items() if self.tick - v[3] > REVISIT]
+                     for k, v in m["trees"].items() if self.tick - v[3] > REVISIT
+                     and not any(math.hypot(v[0] - px, v[1] - py) < TAKEN_R for px, py in taken)]
             if cands:
                 m["target"], m["camp_fruit_tick"] = min(cands)[2], self.tick
         if m["target"] is not None:
@@ -209,14 +230,14 @@ class Hivemind:
             m["mode"] = "camp"
             return 0.0, 0.0, 0.0
 
-        # 5. explore: straight line, bounce off walls
+        # 6. explore (or a spread hop): straight line, bounce off walls
         if m["wall_cooldown"] > 0:
             m["wall_cooldown"] -= 1
         if self._nearest_edge_dist(edges) < WALL_TURN_DIST and m["wall_cooldown"] == 0:
             m["explore_dir"] += self.rng.choice((-1, 1)) * self.rng.uniform(math.pi / 2, math.pi)
             m["wall_cooldown"] = 15
         rel = wrap(m["explore_dir"] - m["h"])
-        m["mode"] = "explore"
+        m["mode"] = "spread" if hopping else "explore"
         return speed, rel, rel if abs(rel) > 0.3 else 0.0
 
     @staticmethod

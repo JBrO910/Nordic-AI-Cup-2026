@@ -74,3 +74,14 @@ Reward = −energy spent/100 per tick, −5 on death. Agent energy U(40,400), pr
 |---|---|---|---|---|---|
 | Task 0 baseline, served `simple_policy` + learned flee net (`flee_weights.npz` present) | 1164 | **1138** | 630 | 50.3 | reference for this plan |
 | Task 0 baseline, same policy with the hand flee rule (weights file removed) | 952 | 924 | 519 | 47.2 | net ON is +214 s; the net wiring is now committed |
+| Task 0 baseline on seeds 13–24 (net ON) | 1104 | 1073 | 822 | 42.4 | 24-seed baseline = **1105 s** |
+| Task 1 spread hop (`SPREAD_DIST` 110, `HOP_TICKS` 15, `HOP_MIN_ENERGY` 120, `TAKEN_R` 40), seeds 1–12 / 13–24 | 1179 / 1131 | 1149 / 1098 | 584 / 897 | 46.9 / 48.7 | 24-seed **1124 s, +18 ± 68 s (paired sd 332), 12/24 seeds win** — noise-level; **kept** (never negative, user hypothesis). Premise check on seeds 1–2: a neighbour is inside 110 px only 21 % of agent-ticks, `spread` is 4 % of mode-ticks; `totree` 23–28 % and `camp` 14–20 % dominate. |
+| Task 2 spread on spawn | — | — | — | — | skipped: subsumed by Task 1 (the richer parent hops away from its newborn) |
+| Task 3 grove preference (`GROVE_VALUE` 80, score = d − 80·grove), 24 seeds | 1045 | 1015 | 592 | 44.8 | **rejected**: −109 s vs Task 1. A 4-tree grove buys 320 px of walking; too far on a dead-reckoned local frame. |
+| Task 3b grove as tie-breaker (`GROVE_VALUE` 30, fruiting-first kept), 24 seeds | 1091 | 1060 | 677 | 44.4 | **rejected**: −64 s vs Task 1. Grove preference does not port from hivemind (shared, drift-corrected map) to the local policy. |
+| Task 4 `SPREAD_DIST` 150, 24 seeds | 1109 | 1077 | 529 | 44.1 | **rejected**: −47 s vs 110. More spreading hurts; 110 is the ceiling. |
+
+**Conclusion (2026-09-17):** spreading is not the bottleneck of `simple_policy` — agents are rarely crowded and the hop is worth
+at most ~+20 s. Time goes to walking between trees and camping at fruitless ones; the local frame's drift makes long
+relocations (grove preference) lose. Eval noise is sd ≈ 330 s per seed, so any change under ~±70 s needs 24+ seeds to call.
+Final policy = Task 1 state: 24-seed mean survived 1124 s (baseline 1105).
