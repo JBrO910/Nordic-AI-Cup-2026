@@ -231,3 +231,9 @@ the sprint lock (20 % of max) — a direct cause of "could not sprint" kills —
 | sprint (served), 96 games | 1311 ± 29 | 1275 | 542 | 59 | 33 % of games > 1450 |
 | breed: fitness = 3·sprint/40 + speed/20 + 1.5·vision/400 + cone/(π/2) + hear/100 − max_e/1000 | 1260 | 1224 | 704 | 56 | sprint 20 → 26 by t=1200, but max_e still 929 (dumps ignore fitness); **rejected** |
 | breed2: + weaker half (below median fitness) may not dump-breed | 1283 | 1218 | **829** | **40** | −28 score, +290 floor, −19 kills; candidate for the one-shot evaluation; pass 2 pending |
+| breed2, pass 2 → 96 games | 1303 ± 27 | 1236 | 760 | 37.6 | 10th percentile 959 vs sprint 929; 27 % > 1450 vs 33 % |
+
+**Decision (2026-09-18 night):** serve **sprint** for validation attempts (best is kept: more high draws). For the one-shot
+evaluation, breed2 is the lower-variance pick at equal mean: `cp scratch/hm_breed2.py src/utils/controllers/hivemind_policy.py`
+and restart `agent_server.py` before enqueueing. Deployment: server on a VM near Hetzner Helsinki (Azure Sweden Central), plain
+`http://<ip>:9052/predict`, no tunnel — the 600 s per-game wait budget is 20 ms per tick including network.
