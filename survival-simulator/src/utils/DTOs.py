@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 class ActionRequest(BaseModel):
     """
@@ -17,8 +17,8 @@ class ObservationResponse(BaseModel):
     """
     agent_id: int
     energy: float
-    biome: str
-    age: float
+    biome: str = ""
+    age: float = 0.0
 
     # Agent attributes
     speed: float
@@ -35,8 +35,8 @@ class StepResponse(BaseModel):
     """
     Data transfer object to receive a step response
     """
-    game_status: str
-    score: float
-    sim_time: float
-    n_agents: int
+    game_status: str = ""
+    score: float = 0.0
+    sim_time: Optional[float] = None   # the platform's verify sample omits it; agent_server counts ticks then
+    n_agents: int = 0
     agent_status: List[ObservationResponse] = []
