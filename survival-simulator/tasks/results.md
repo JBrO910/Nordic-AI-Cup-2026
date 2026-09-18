@@ -159,3 +159,17 @@ At death (t≈1050–1330) the map still holds 20–30 trees and 30–45 uneaten
 27–40 %, eating/walking-to-fruit 12–14 %; median uneaten fruit is 320–350 px from the nearest agent, only 10–11 % within 150 px;
 the hivemind knows 13–18 % of map fruit; 34–49 % of agents can sprint. The colony starves next to food it neither reaches
 (`HOME_REACH` 320, `FRUIT_REACH` 200) nor knows about (`TREE_TTL` 60 s < tree lifetime, explore only after 15 s idle, ≤ 600 px).
+
+### Forage variants (2026-09-18), hivemind + flee net v1, 48 games each (24 seeds × 2), baseline same-day 1173 (96-game 1189)
+
+| Variant (all changes from t=600 unless noted) | mean survived | min | kills/run | note |
+|---|---|---|---|---|
+| reach: `HOME_REACH` 320→600, `FRUIT_REACH` 200→350 | 1144 | 555 | 42.6 | mechanism moved (sit 27→9 %, eat+tofruit 14→27 %, sprint-able 49→64 % on seed 1) but fleeing rose to 57 %; **flat** |
+| survey: `HOP_AFTER` 150→60, explore ≤ 900 px, `TREE_TTL` 600→900 | 1140 | 611 | 41.9 | known fruit 13–18 → 14–21 %; **flat** |
+| pop: `POP_CAP` flat 12 to 1800, `RESERVE` 80 from t=600 | 1148 | 745 | 46.3 | sprint-able 32 % (thinner energy per agent); **flat** |
+| **disperse**: reach + `SPREAD_DIST` 110→300 (one agent per tree) | 1254 / 1209 (2 passes) | 810 / 645 | 47.5 / 54.2 | **96-game 1231, +42 ± 48**; late fleeing 40→27 % on seed 1 (one run reached 1797); kills up; not clearly above noise |
+| disperse + pop | 1145 | 689 | 50.2 | **rejected** |
+
+Predator facts that bound the late game (`environment.py:674-728`, `predator.py`): predators spawn asleep, wake at 100 energy,
+walk at 5.5 energy/s and sprint at ~25/s → a chase lasts ≈ 4 s before a 3.3 s rest; eating refills to 200. Agents out-sprint
+them (20 vs 15 px/tick) only above 20 % energy. Predator count = 0.01·t (18 at t=1800, 30 at 3000), never despawn.

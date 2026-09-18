@@ -1,10 +1,12 @@
-"""Why does the colony die? python scratch/collapse.py <seed> -> per-100 s window: pop, trees, fruit on map, predators,
+"""Why does the colony die? python scratch/collapse.py <seed> [module:Class] -> per-100 s window: pop, trees, fruit on map, predators,
 deaths split into eaten / starved-young / starved-old (age > max_age), births, mean energy fill."""
 import sys, collections; sys.path.insert(0, ".")
 import pygame; pygame.init()
 from src.core import SimulationCore
-from src.utils.controllers.hivemind_policy import Hivemind
+import importlib
 seed = int(sys.argv[1])
+spec = sys.argv[2] if len(sys.argv) > 2 else "src.utils.controllers.hivemind_policy:Hivemind"
+Hivemind = getattr(importlib.import_module(spec.split(":")[0]), spec.split(":")[1])
 sim = SimulationCore(seed=seed); env = sim.env; pol = Hivemind()
 W = collections.OrderedDict()
 def w(t):

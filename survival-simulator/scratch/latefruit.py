@@ -1,10 +1,12 @@
 """Late game: where do agents spend ticks, and how far is uneaten fruit from them / from the shared map's knowledge?
-python scratch/latefruit.py <seed> [t0=700]"""
+python scratch/latefruit.py <seed> [t0=700] [module:Class]"""
 import sys, math, collections; sys.path.insert(0, ".")
 import pygame; pygame.init()
 from src.core import SimulationCore
-from src.utils.controllers.hivemind_policy import Hivemind
+import importlib
 seed = int(sys.argv[1]); t0 = float(sys.argv[2]) if len(sys.argv) > 2 else 700.0
+spec = sys.argv[3] if len(sys.argv) > 3 else "src.utils.controllers.hivemind_policy:Hivemind"
+Hivemind = getattr(importlib.import_module(spec.split(":")[0]), spec.split(":")[1])
 sim = SimulationCore(seed=seed); env = sim.env; pol = Hivemind()
 modes = collections.Counter(); dist_near = []; dist_known = []; known_frac = []; sprint_ok = []; n = 0
 state = sim.step([])
