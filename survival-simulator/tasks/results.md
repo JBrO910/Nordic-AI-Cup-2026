@@ -127,3 +127,16 @@ drew 1106 s — a 130 s swing with no code change, which is the noise floor to k
 12-seed Tasks 9–10 found 16/20 worse. Agent count in 8–14, with or without a taper in either direction, does not move
 survival. `POP_CAP` stays `[(0,12),(600,12),(1800,5)]`. Kills scale with the cap (flat 8: 38, flat 14: 51) while survival
 does not, so more agents ≈ more predator food, fewer agents ≈ less foraging — the two cancel.
+
+### Shared map (2026-09-18): serve `hivemind_policy` + learned flee net
+
+The simulator is **nondeterministic per seed** (SPEC; confirmed: same code, seed 1 survived 710 s then 1412 s), so
+`--repeat` adds real samples. Rows below are 24 seeds × passes.
+
+| Policy | pass 1 | pass 2 | mean survived | kills/run | note |
+|---|---|---|---|---|---|
+| `simple_policy` Task 1 state (served until now) | 1124 | 1124 | **1124** | 47.0 | per-seed values differ between passes; equal means are coincidence |
+| `hivemind_policy` as-is (hand flee rule) | 1019 | — | 1019 | 51.8 | seeds 1–12 alone: 1007 vs the 1142 recorded for the same commit — that gap is run-to-run noise |
+| `hivemind_policy` + flee net (`FLEE_NET`, same wiring as simple_policy) | 1227 | 1184 | **1205** | 44.4 | **accepted, now served**: +81 s over simple_policy across 48 games, +186 s over hivemind without the net |
+
+Server smoke (`scratch/server_smoke.py`): 10.9 ms/tick mean, 38 ms max, clean reset on game 2.

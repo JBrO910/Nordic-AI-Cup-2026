@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Body
 from src.utils.DTOs import StepResponse
-from src.utils.controllers.simple_policy import Hivemind
+from src.utils.controllers.hivemind_policy import Hivemind
 
 HOST = "0.0.0.0"
 PORT = 9052

@@ -8,8 +8,10 @@ Per agent priority (see _plan): flee predators > eat visible fruit > finish a sc
 fruit > forage (stay near trees, keep spread out, relocate/explore when the patch is quiet) > sit and scan.
 """
 import math
+import os
 import random
 from src.utils.DTOs import ActionRequest
+from src.utils.controllers import flee_net
 
 W, H, WALL = 1600, 1200, 30
 
@@ -41,6 +43,7 @@ STUCK_SNAPS = 5          # consecutive ticks the pose fix undoes our commanded m
 STUCK_SNAP_FRACTION = 0.6
 BLACKLIST_TICKS = 200    # how long an unreachable target stays off-limits
 BIOME_PENALTY = {"swamp": 0.5, "desert": 0.8, "river": 0.3}
+FLEE_NET = flee_net.load() if os.path.exists(flee_net.WEIGHTS) else None   # learned evasion (scratch/train_flee.py); None = hand rule
 
 
 def interp(t, pts):
@@ -389,7 +392,11 @@ class Hivemind:
         if preds:
             p = min(preds, key=lambda o: o["distance"])
             m["pred"], m["pred_tick"] = wrap(m["h"] + p["angle"]), self.tick  # absolute bearing
+            m["pred_obs"] = (p["distance"], p["rel_dir"])
             self.last_predator_tick = self.tick
+            if FLEE_NET is not None:
+                m["scan_left"], m["mode"] = 0, "flee"
+                return flee_net.act(FLEE_NET, a, (p["distance"], p["angle"], p["rel_dir"]), True)
             fx = fy = 0.0
             for o in preds:
                 w = 1.0 / max(o["distance"], 1.0)
@@ -405,6 +412,8 @@ class Hivemind:
             return (sprint if m["sprinting"] else speed), away, p["angle"] - 0.35
         if m["pred"] is not None and self.tick - m["pred_tick"] < FLEE_MEMORY:
             m["mode"] = "flee_mem"
+            if FLEE_NET is not None:
+                return flee_net.act(FLEE_NET, a, (m["pred_obs"][0], wrap(m["pred"] - m["h"]), m["pred_obs"][1]), False)
             return speed, self._flee_dir(m, wrap(m["pred"] + math.pi - m["h"])), 0.0
         return None
 
