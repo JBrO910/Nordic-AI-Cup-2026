@@ -392,7 +392,8 @@ class Hivemind:
         if preds:
             p = min(preds, key=lambda o: o["distance"])
             m["pred"], m["pred_tick"] = wrap(m["h"] + p["angle"]), self.tick  # absolute bearing
-            m["pred_obs"] = (p["distance"], p["rel_dir"])
+            m["pred_obs"] = (m["x"] + p["distance"] * math.cos(m["h"] + p["angle"]),
+                             m["y"] + p["distance"] * math.sin(m["h"] + p["angle"]), p["rel_dir"])  # last known position
             self.last_predator_tick = self.tick
             if FLEE_NET is not None:
                 m["scan_left"], m["mode"] = 0, "flee"
@@ -413,7 +414,8 @@ class Hivemind:
         if m["pred"] is not None and self.tick - m["pred_tick"] < FLEE_MEMORY:
             m["mode"] = "flee_mem"
             if FLEE_NET is not None:
-                return flee_net.act(FLEE_NET, a, (m["pred_obs"][0], wrap(m["pred"] - m["h"]), m["pred_obs"][1]), False)
+                dx, dy = m["pred_obs"][0] - m["x"], m["pred_obs"][1] - m["y"]
+                return flee_net.act(FLEE_NET, a, (math.hypot(dx, dy), wrap(math.atan2(dy, dx) - m["h"]), m["pred_obs"][2]), False)
             return speed, self._flee_dir(m, wrap(m["pred"] + math.pi - m["h"])), 0.0
         return None
 

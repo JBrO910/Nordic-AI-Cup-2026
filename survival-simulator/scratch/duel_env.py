@@ -1,4 +1,4 @@
-"""Randomized 1-v-1 evasion env on real maps (obstacles + biomes kept, trees/fruit/random predators removed).
+"""Randomized 1-v-N evasion env (extra awake predators in ~half the setups) on real maps (obstacles + biomes kept, trees/fruit/random predators removed).
 
 Episode: one agent, one awake predator placed at random distance/angle. Reward = -energy spent / 100 per tick, -5 on
 death. Ends when the agent dies, the predator rests, the predator has been > 350 px away for 30 ticks, or 300 ticks.
@@ -67,6 +67,17 @@ class DuelEnv:
             ag.energy = e0
             if ag not in env.agents:  # eaten during the probe step
                 env.agents.append(ag); env.agents_dict[ag.agent_id] = ag
+        n_extra = 0 if rng.random() < 0.5 else (1 if rng.random() < 0.7 else 2)   # v2: crowds like the late game
+        for _ in range(n_extra):
+            for _try in range(50):
+                d, ang = rng.uniform(60, 300), rng.uniform(-math.pi, math.pi)
+                qx, qy = ag.x + d * math.cos(ang), ag.y + d * math.sin(ang)
+                if 40 < qx < env.width - 40 and 40 < qy < env.height - 40 and self._free(qx, qy):
+                    q = Predator(qx, qy, rng=env.rng)
+                    q.energy, q.resting, q.direction = rng.uniform(50, 200), False, math.atan2(ag.y - qy, ag.x - qx)
+                    env.predators.append(q)
+                    break
+        env._update_predator_grid()
         self.pred, self.ticks, self.far, self.spent = p, 0, 0, 0.0
         self.pred_world, self.last_rel = (px, py), 0.0
         return self._observe()
@@ -99,8 +110,9 @@ class DuelEnv:
             return None, -DEATH, True
         self.spent += e0 - self.agent.energy
         reward = -(e0 - self.agent.energy) / 100
-        self.far = self.far + 1 if math.hypot(self.pred.x - self.agent.x, self.pred.y - self.agent.y) > FAR else 0
-        done = self.pred.resting or self.far >= FAR_TICKS or self.ticks >= MAX_TICKS
+        near = min(math.hypot(q.x - self.agent.x, q.y - self.agent.y) for q in self.env.predators)
+        self.far = self.far + 1 if near > FAR else 0
+        done = all(q.resting for q in self.env.predators) or self.far >= FAR_TICKS or self.ticks >= MAX_TICKS
         return self._observe(), reward, done
 
 

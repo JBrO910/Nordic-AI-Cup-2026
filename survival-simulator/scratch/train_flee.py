@@ -1,7 +1,7 @@
 """PPO for the evasion sub-policy on DuelEnv. Rollouts: pool workers run whole episodes with a numpy copy of the
 weights; the update runs in the parent (torch, CPU). Best fixed-setup eval is saved to
 src/utils/controllers/flee_weights.npz (numpy forward pass at serve time, no torch).
-python scratch/train_flee.py [iterations] [resume]   (resume: continue from the saved weights)"""
+python scratch/train_flee.py [iterations] [resume] [out.npz]   (resume: continue from the saved weights)"""
 import sys, random, time
 sys.path.insert(0, ".")
 import numpy as np
@@ -47,7 +47,8 @@ if __name__ == "__main__":
     from multiprocessing import Pool
     iters = int(sys.argv[1]) if len(sys.argv) > 1 else 300
     torch.manual_seed(0)
-    WORKERS, EPS_PER_WORKER, N_EVAL = 20, 24, 300
+    OUT = sys.argv[3] if len(sys.argv) > 3 else WEIGHTS
+    WORKERS, EPS_PER_WORKER, N_EVAL = 20, 36, 400
     GAMMA, LAM, CLIP, EPOCHS, MB, LR, ENT = 0.99, 0.95, 0.2, 4, 4096, 2e-4, 0.01
 
     class Net(nn.Module):
@@ -86,6 +87,8 @@ if __name__ == "__main__":
     with Pool(WORKERS) as pool:
         for it in range(iters):
             t0 = time.time()
+            for g in opt.param_groups:
+                g["lr"] = LR * (1 - 0.9 * it / iters)   # linear decay to 10 %
             W = net.numpy()
             parts = pool.map(_rollout, [(W, ep_counter + w * EPS_PER_WORKER, EPS_PER_WORKER) for w in range(WORKERS)])
             ep_counter += WORKERS * EPS_PER_WORKER
@@ -124,5 +127,5 @@ if __name__ == "__main__":
                           spent=sum(r["spent"] for r in rows) / m)
                 msg += f" | EVAL reward {ev['reward']:.3f} death {ev['death_rate']:.3f} spent {ev['spent']:.1f}"
                 if ev["reward"] > best:
-                    best = ev["reward"]; np.savez(WEIGHTS, **W); msg += " *saved*"
+                    best = ev["reward"]; np.savez(OUT, **W); msg += " *saved*"
             print(msg, flush=True)

@@ -6,8 +6,8 @@ import numpy as np
 BIOME_PENALTY = {"swamp": 0.5, "desert": 0.8, "river": 0.3}
 N_DIR = 8
 HEADS = (3, N_DIR, 3)
-OBS_DIM = 12
-WEIGHTS = os.path.join(os.path.dirname(__file__), "flee_weights.npz")
+OBS_DIM = 16
+WEIGHTS = os.environ.get("FLEE_WEIGHTS", os.path.join(os.path.dirname(__file__), "flee_weights.npz"))
 
 
 def nearest_edge(edges):
@@ -29,10 +29,17 @@ def featurize(a, pred, seen):
     or its last known values when not currently observed (`seen` False)."""
     d, ang, rel = pred
     ed, eang = nearest_edge([o["coords"] for o in a["observations"] if o["type"] == "Edge"])
+    others = sorted(o["distance"] for o in a["observations"] if o["type"] == "Predator")[1 if seen else 0:]
+    if others:  # second-closest visible predator (v2 feature; zero rows in v1 weights)
+        o2 = next(o for o in a["observations"] if o["type"] == "Predator" and o["distance"] == others[0])
+        d2, a2, p2 = min(o2["distance"], 400) / 250, o2["angle"], 1.0
+    else:
+        d2, a2, p2 = 400 / 250, 0.0, 0.0
     return np.array([min(d, 400) / 250, math.cos(ang), math.sin(ang), math.cos(rel), math.sin(rel),
                      a["energy"] / a["max_energy"], float(a["energy"] > 0.2 * a["max_energy"] + 5),
                      min(ed, 200) / 100, math.cos(eang), math.sin(eang),
-                     BIOME_PENALTY.get(a["biome"], 1.0), float(seen)], dtype=np.float32)
+                     BIOME_PENALTY.get(a["biome"], 1.0), float(seen),
+                     d2, math.cos(a2) * p2, math.sin(a2) * p2, p2], dtype=np.float32)
 
 
 def decode(action, a, pred):
