@@ -107,7 +107,7 @@ class Hivemind:
         self.trees = []       # [x, y, last_seen, fruit_seen]
         self.predators = []   # [x, y, last_seen]
         self.claims = {}      # agent_id -> index into self.fruits
-        self.landmarks = {}   # round(edge length, 4) -> [(ax1, ay1, ax2, ay2), ...]
+        self.landmarks = {}   # round(edge length, 4) -> [(ax1, ay1, ax2, ay2, abs_dir), ...]
         self.cell_seen = {}   # (i, j) -> tick a localized agent last stood in that cell
         self.terrain = {}     # (x//40, y//40) -> biome name, learned from localized agents' own biome
 
@@ -207,7 +207,7 @@ class Hivemind:
             seg = (*self._to_world(m, rx1, ry1), *self._to_world(m, rx2, ry2))
             lst = self.landmarks.setdefault(round(L, 4), [])
             if not any(abs(seg[0] - l[0]) < 0.5 and abs(seg[1] - l[1]) < 0.5 for l in lst):
-                lst.append(seg)
+                lst.append(seg + (math.atan2(seg[3] - seg[1], seg[2] - seg[0]),))   # absolute direction, precomputed
 
     def _propagate_fixes(self, agents):
         """A well-localized agent fixes the position and heading of every agent it sees."""
@@ -239,21 +239,24 @@ class Hivemind:
     def _fix_from_landmarks(self, edges, m):
         """Pose from learned obstacle edges. Same-length siblings (and corner-grazed far edges) are
         disambiguated by consistency with our estimate, or by two edges agreeing when unlocalized."""
+        localized = m["err"] < 80
+        mh, mx, my, reach = m["h"], m["x"], m["y"], m["err"] + 15
         cands = []
         for ei, ((rx1, ry1), (rx2, ry2)) in enumerate(edges):
             L = math.hypot(rx2 - rx1, ry2 - ry1)
             rdir = math.atan2(ry2 - ry1, rx2 - rx1)
-            for ax1, ay1, ax2, ay2 in self.landmarks.get(round(L, 4), ()):
-                h = wrap(math.atan2(ay2 - ay1, ax2 - ax1) - rdir)
+            for ax1, ay1, ax2, ay2, adir in self.landmarks.get(round(L, 4), ()):
+                h = wrap(adir - rdir)
+                if localized and abs(wrap(h - mh)) >= 0.02:   # cheap heading test first: most landmarks fail it
+                    continue
                 ox, oy = rx1 * math.cos(h) - ry1 * math.sin(h), rx1 * math.sin(h) + ry1 * math.cos(h)
                 cands.append((ax1 - ox, ay1 - oy, h, ei))
         if not cands:
             return None
-        if m["err"] < 80:
-            ok = [c for c in cands if abs(wrap(c[2] - m["h"])) < 0.02
-                  and math.hypot(c[0] - m["x"], c[1] - m["y"]) < m["err"] + 15]
+        if localized:
+            ok = [c for c in cands if math.hypot(c[0] - mx, c[1] - my) < reach]
             if ok:
-                c = min(ok, key=lambda c: math.hypot(c[0] - m["x"], c[1] - m["y"]))
+                c = min(ok, key=lambda c: math.hypot(c[0] - mx, c[1] - my))
                 return c[0], c[1], c[2], 0.5
             return None
         for i, c in enumerate(cands):  # unlocalized: two different edges must agree
@@ -618,7 +621,7 @@ class Hivemind:
     def _blocked_abs(self, x1, y1, x2, y2):
         """Does the absolute segment cross any learned obstacle edge near it?"""
         for segs in self.landmarks.values():
-            for ax1, ay1, ax2, ay2 in segs:
+            for ax1, ay1, ax2, ay2, _ in segs:
                 if abs(ax1 - x1) > 200 or abs(ay1 - y1) > 200:
                     continue
                 px, py, ex, ey = x2 - x1, y2 - y1, ax2 - ax1, ay2 - ay1

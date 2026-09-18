@@ -176,3 +176,11 @@ them (20 vs 15 px/tick) only above 20 % energy. Predator count = 0.01·t (18 at 
 
 **Served (2026-09-18 12:10): hivemind + flee net v1 + disperse** (`HOME_REACH` 600 / `FRUIT_REACH` 350 / `SPREAD_DIST` 300 from
 t=600). 96-game mean 1231 s vs 1189 baseline; server smoke 11 ms/tick mean, 88 ms max, clean reset.
+
+### Platform validation attempt 1 (2026-09-18): 666 s, "agent server bottleneck: accumulated wait > 600 s"
+
+Budget = 600 s wait per game = 20 ms per tick *including network*. Server via a Cloudflare quick tunnel from a Windows box:
+~90 ms/tick (tunnel RTT ~100 ms; platform is Hetzner Helsinki, 46.62.240.126). Fixes: `_fix_from_landmarks` heading test
+moved before the trig/hypot (identical result) → decide 8 → 2.0 ms/tick, server-side < 1 ms per request; host the server on
+a Hetzner VM in `hel1` (same DC, ~1 ms RTT) and register `http://<ip>:9052/predict` directly. 24-game sanity after the
+optimization: 1278 s (disperse range).
