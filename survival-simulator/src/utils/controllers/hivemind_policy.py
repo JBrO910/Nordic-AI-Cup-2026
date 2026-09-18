@@ -37,6 +37,7 @@ NEAR_TREE = 50           # a known tree this close = stay put
 GROVE_R = 120            # trees within this of a spot all feed it
 GROVE_VALUE = 80         # px of walking one extra fruiting tree is worth
 SPREAD_DIST = 110        # idle agents keep at least this far apart
+SPREAD_LATE = 300        # ...from t=600: one agent per tree, predators only ever find one of us
 SCAN_EVERY = [(0, 30), (1500, 25)]               # ticks between scans while sitting
 FRUIT_TTL, TREE_TTL, FRUITING_TTL = 500, 600, 400
 STUCK_SNAPS = 5          # consecutive ticks the pose fix undoes our commanded move -> we are pushing on a wall
@@ -328,7 +329,7 @@ class Hivemind:
                        for a, m in loc for i, f in enumerate(self.fruits))
         taken = set()
         for d, aid, i in pairs:
-            if d > FRUIT_REACH or aid in self.claims or i in taken                     or self._is_blacklisted(self.mem[aid], self.fruits[i][0], self.fruits[i][1]):
+            if d > (350 if self.tick >= 6000 else FRUIT_REACH) or aid in self.claims or i in taken                     or self._is_blacklisted(self.mem[aid], self.fruits[i][0], self.fruits[i][1]):
                 continue
             self.claims[aid] = i
             taken.add(i)
@@ -341,7 +342,7 @@ class Hivemind:
         # a fruiting tree nobody sits at = room for one more mouth: breed cheaply
         loc = [m for m in self.mem.values() if m["err"] <= LOC_OK]
         free = sum(1 for tr in self.trees if self.tick - tr[3] < FRUITING_TTL
-                   and not any(math.hypot(tr[0] - m["x"], tr[1] - m["y"]) < SPREAD_DIST for m in loc))
+                   and not any(math.hypot(tr[0] - m["x"], tr[1] - m["y"]) < self._spread() for m in loc))
         if free:
             reserve = RESERVE_FREE
         chosen = set()
@@ -480,7 +481,7 @@ class Hivemind:
                  if oid != a["agent_id"] and om["err"] <= LOC_OK and om["mode"] in ("sit", "scan", "")]
         d_crowd, oid = min(crowd) if crowd else (1e9, None)
         richer = oid is not None and (self.energy[oid], -oid) < (a["energy"], -a["agent_id"])
-        if d_crowd < SPREAD_DIST and richer and a["energy"] > HOP_MIN_ENERGY and self.tick >= m["hop_until"]:
+        if d_crowd < self._spread() and richer and a["energy"] > HOP_MIN_ENERGY and self.tick >= m["hop_until"]:
             om = self.mem[oid]
             m["hop_until"] = self.tick + 15
             m["hop_dir"] = math.atan2(m["y"] - om["y"], m["x"] - om["x"]) + self.rng.uniform(-0.4, 0.4)
@@ -497,9 +498,9 @@ class Hivemind:
         best = None
         for tr in self.trees:
             d = math.hypot(tr[0] - m["x"], tr[1] - m["y"])
-            if d > HOME_REACH or (near_tree and d < NEAR_TREE) or self._is_blacklisted(m, tr[0], tr[1]):
+            if d > (600 if self.tick >= 6000 else HOME_REACH) or (near_tree and d < NEAR_TREE) or self._is_blacklisted(m, tr[0], tr[1]):
                 continue
-            if any(math.hypot(tr[0] - om["x"], tr[1] - om["y"]) < SPREAD_DIST for oid, om in self.mem.items()
+            if any(math.hypot(tr[0] - om["x"], tr[1] - om["y"]) < self._spread() for oid, om in self.mem.items()
                    if oid != a["agent_id"] and om["err"] <= LOC_OK):
                 continue
             score = d - GROVE_VALUE * self._grove_value(tr)
@@ -513,6 +514,9 @@ class Hivemind:
         m["fruit_tick"], m["target_xy"] = self.tick, (tx, ty)
         m["mode"] = "totree"
         return min(a["speed"], d - 15), rel, rel if abs(rel) > 0.5 else 0.0
+
+    def _spread(self):
+        return SPREAD_LATE if self.tick >= 6000 else SPREAD_DIST
 
     def _grove_value(self, spot):
         """Expected fruit rate around a spot: known trees within GROVE_R, each weighted by how recently it fruited."""

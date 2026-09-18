@@ -173,3 +173,6 @@ the hivemind knows 13–18 % of map fruit; 34–49 % of agents can sprint. The c
 Predator facts that bound the late game (`environment.py:674-728`, `predator.py`): predators spawn asleep, wake at 100 energy,
 walk at 5.5 energy/s and sprint at ~25/s → a chase lasts ≈ 4 s before a 3.3 s rest; eating refills to 200. Agents out-sprint
 them (20 vs 15 px/tick) only above 20 % energy. Predator count = 0.01·t (18 at t=1800, 30 at 3000), never despawn.
+
+**Served (2026-09-18 12:10): hivemind + flee net v1 + disperse** (`HOME_REACH` 600 / `FRUIT_REACH` 350 / `SPREAD_DIST` 300 from
+t=600). 96-game mean 1231 s vs 1189 baseline; server smoke 11 ms/tick mean, 88 ms max, clean reset.
