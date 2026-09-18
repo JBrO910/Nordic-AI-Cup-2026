@@ -48,7 +48,16 @@ class DuelEnv:
             ag.cone_angle = min(math.pi / 2, math.pi / 3 * rng.uniform(0.7, 1.3))
         else:
             ag.speed, ag.sprint_speed, ag.cone_angle = 10.0, 20.0, math.pi / 3
+        tries = 0
         while True:  # start at the moment of first sighting: in the vision cone (or hearing radius), not occluded
+            tries += 1
+            if tries > 60:  # some agent spots never yield a sighting (one hung a pool worker for 3.6 h): re-place the agent
+                tries = 0
+                while True:
+                    ag.x, ag.y = rng.uniform(40, env.width - 40), rng.uniform(40, env.height - 40)
+                    if self._free(ag.x, ag.y):
+                        break
+                ag.direction = rng.uniform(-math.pi, math.pi)
             if rng.random() < 0.8:
                 d, ang = rng.uniform(40, ag.vision_radius), ag.direction + rng.uniform(-ag.cone_angle / 2, ag.cone_angle / 2)
             else:
