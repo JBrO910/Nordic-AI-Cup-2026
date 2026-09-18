@@ -219,3 +219,4 @@ several predators in view, ~1 % never saw it. The sprint variant targets the fir
 
 Both variants also cost ray casts (decide 2.6 → 5.5 ms/tick). Lesson: the sitting heading is load-bearing for the ripe-fruit
 mechanism; any facing rule must keep the home tree inside the cone or the hearing radius.
+| view2: open-view heading constrained to keep the nearest tree (< 80 px) inside the cone (7 candidates in ±(half−0.15) around the tree bearing) | 1165 | 702 | 49.9 | **rejected, −110**. Fewer kills (50 vs 62) but shorter games: sitting heading is not the lever; the constant turning (any |Δ| > 0.25 rad) also keeps agents out of the plain `sit` state |
