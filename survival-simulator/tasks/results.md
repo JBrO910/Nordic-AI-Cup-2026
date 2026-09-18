@@ -140,3 +140,22 @@ The simulator is **nondeterministic per seed** (SPEC; confirmed: same code, seed
 | `hivemind_policy` + flee net (`FLEE_NET`, same wiring as simple_policy) | 1227 | 1184 | **1205** | 44.4 | **accepted, now served**: +81 s over simple_policy across 48 games, +186 s over hivemind without the net |
 
 Server smoke (`scratch/server_smoke.py`): 10.9 ms/tick mean, 38 ms max, clean reset on game 2.
+
+### Flee-net RL round 2 (2026-09-18): plateau — no variant beats v1
+
+| Candidate | training | 48-game mean survived | kills/run | note |
+|---|---|---|---|---|
+| v1 (served, zero-padded to OBS_DIM 16) | — | 1173 | 45.9 | same-day reference (`scratch/night_v1_full.txt`) |
+| v2 duel: second-predator features, 1-v-N duel env, 1161 PPO iters | duel eval −2.14 / 31 % vs v1 −2.38 / 34 % | 1199 | 41.7 | +26 s, noise; **not adopted** |
+| in-game PPO (`scratch/train_flee_game.py`), 37 iters × 20 full games, ~380 k flee steps/iter | ep reward −0.88 → −0.84, deaths/flee-episode 11.2 → 10.4 % | 1218 (24 games, greedy eval it 19) | 39.8 | flat within ±70; stopped; **not adopted** |
+
+Conclusion: evasion is at its ceiling for this net. Deaths are ~11 % of in-game flee episodes; the remaining kills hit agents that
+never saw the predator or could not sprint (energy < 20 %). First duel run stalled at it 284 on an unbounded placement loop (fixed).
+
+### Why the colony dies (`scratch/collapse.py`, `scratch/latefruit.py`, hivemind, seeds 1–3)
+
+At death (t≈1050–1330) the map still holds 20–30 trees and 30–45 uneaten fruit. From t≈500 deaths ≥ births; energy fill 25–30 %;
+`POP_CAP` shrinks the colony to 7 at t=1000 while births need ≥ 250 energy. Late game (t ≥ 700): `sit` 27–33 % of ticks, fleeing
+27–40 %, eating/walking-to-fruit 12–14 %; median uneaten fruit is 320–350 px from the nearest agent, only 10–11 % within 150 px;
+the hivemind knows 13–18 % of map fruit; 34–49 % of agents can sprint. The colony starves next to food it neither reaches
+(`HOME_REACH` 320, `FRUIT_REACH` 200) nor knows about (`TREE_TTL` 60 s < tree lifetime, explore only after 15 s idle, ≤ 600 px).
