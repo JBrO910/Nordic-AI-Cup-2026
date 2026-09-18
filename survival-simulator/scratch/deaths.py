@@ -2,7 +2,7 @@
 import sys, math, pygame, collections; pygame.init()
 sys.path.insert(0, ".")
 from src.core import SimulationCore
-from src.utils.controllers.hivemind_policy import Hivemind
+from scratch.hm_ripe_pop12 import Hivemind
 seed = int(sys.argv[1]); tmax = float(sys.argv[2])
 sim = SimulationCore(seed=seed); hm = Hivemind(); env = sim.env
 state = sim.step([]); hist = collections.defaultdict(list); prev_score = 0; rows = []

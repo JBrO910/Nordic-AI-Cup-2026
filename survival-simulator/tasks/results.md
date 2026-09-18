@@ -202,3 +202,9 @@ Result: mean energy per fruit 32 → 45, young share 61 → 21 %, early energy f
 Why everything lands at 1200–1280: with N ≈ 0.01·t predators each sweeping ~110 px/s × 250 px of vision, an agent is seen
 about every 10 s at t≈1000 and loses ~11 % of encounters → life expectancy ≈ 100 s regardless of food; at t=1800 (18
 predators) ≈ 55 s, below reproduction age. Food, spacing, reach and population are upstream of that limit.
+| ripe + cap 12, pass 2 | 1202 | 646 | 54.8 | 96-game 1236 ± 30 — flat vs disperse |
+| **sprint** = ripe + cap 12 + `HUNGRY` 0.30 + `RESERVE` 120 from t=600 + `SCAN_EVERY` 15 / alert 10 from t=600 | 1289 / 1262 | 728 / 517 | 62.5 | **96-game 1275 ± 28 vs disperse 1231 ± 27; 21 % of games > 1500 s; served 2026-09-18 15:45** |
+
+Kill post-mortem (`scratch/deaths.py`, ripe+cap12, seeds 1–3, 188 kills): 35–45 % could not sprint when the predator was first
+seen (energy < 105), 25–30 % first detected under 60 px (heard, outside the cone), ~50 % were sitting/scanning, 30 % had
+several predators in view, ~1 % never saw it. The sprint variant targets the first two. decide 2.6 ms/tick mean, 14 ms max.
