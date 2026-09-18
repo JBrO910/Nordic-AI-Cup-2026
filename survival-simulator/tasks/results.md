@@ -220,3 +220,14 @@ several predators in view, ~1 % never saw it. The sprint variant targets the fir
 Both variants also cost ray casts (decide 2.6 → 5.5 ms/tick). Lesson: the sitting heading is load-bearing for the ripe-fruit
 mechanism; any facing rule must keep the home tree inside the cone or the hearing radius.
 | view2: open-view heading constrained to keep the nearest tree (< 80 px) inside the cone (7 candidates in ±(half−0.15) around the tree bearing) | 1165 | 702 | 49.9 | **rejected, −110**. Fewer kills (50 vs 62) but shorter games: sitting heading is not the lever; the constant turning (any |Δ| > 0.25 rad) also keeps agents out of the plain `sit` state |
+
+### Selective breeding (2026-09-18 night), 48 games each; leaderboard ranks *score*, not survived
+
+Children mutate ±50 % per trait (10 % each); the old `fitness()` bred for max_energy (500 → 960 over a game), which raises
+the sprint lock (20 % of max) — a direct cause of "could not sprint" kills — and ignored sprint speed (cap 40, predators 15).
+
+| Variant | score | survived | min score | kills/run | note |
+|---|---|---|---|---|---|
+| sprint (served), 96 games | 1311 ± 29 | 1275 | 542 | 59 | 33 % of games > 1450 |
+| breed: fitness = 3·sprint/40 + speed/20 + 1.5·vision/400 + cone/(π/2) + hear/100 − max_e/1000 | 1260 | 1224 | 704 | 56 | sprint 20 → 26 by t=1200, but max_e still 929 (dumps ignore fitness); **rejected** |
+| breed2: + weaker half (below median fitness) may not dump-breed | 1283 | 1218 | **829** | **40** | −28 score, +290 floor, −19 kills; candidate for the one-shot evaluation; pass 2 pending |
