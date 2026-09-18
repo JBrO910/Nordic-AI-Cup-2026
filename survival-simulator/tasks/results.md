@@ -184,3 +184,21 @@ Budget = 600 s wait per game = 20 ms per tick *including network*. Server via a 
 moved before the trig/hypot (identical result) → decide 8 → 2.0 ms/tick, server-side < 1 ms per request; host the server on
 a Hetzner VM in `hel1` (same DC, ~1 ms RTT) and register `http://<ip>:9052/predict` directly. 24-game sanity after the
 optimization: 1278 s (disperse range).
+
+### Late-game structural round (2026-09-18 afternoon), hivemind + flee v1 + disperse base, 48 games each
+
+Measured first: the colony eats its fruit young — mean 31–36 energy per fruit, 55–68 % eaten under 30, 10–15 % ripe (fruit is
+20 at spawn, 60 after 20 s, rots at 50 s). `scratch/hm_ripe.py`: fruit map records carry `ripe_tick` = (last tick any localized
+agent could perceive the spot, 30 s pose history) + 200; claims and close-range eating skip unripe fruit unless energy < 25 %.
+Result: mean energy per fruit 32 → 45, young share 61 → 21 %, early energy fill 48 → 80 %.
+
+| Variant | mean survived | min | kills/run | note |
+|---|---|---|---|---|
+| ripe | 1231 | 754 | 54.0 | flat vs disperse 1231: extra energy is capped away (`max_energy`, `POP_CAP` 12→7→5) |
+| **ripe + `POP_CAP` flat 12 to 1800 (`RESERVE` 80 from 600)** | **1271** | 662 | 55.6 | highest mean; second pass pending |
+| ripe + cap 16 | 1252 | 773 | 61.8 | |
+| ripe + avoid (fresh map predator < 280 px: face it, walk off) | 1207 | 755 | 50.4 | kills −4, survival flat |
+
+Why everything lands at 1200–1280: with N ≈ 0.01·t predators each sweeping ~110 px/s × 250 px of vision, an agent is seen
+about every 10 s at t≈1000 and loses ~11 % of encounters → life expectancy ≈ 100 s regardless of food; at t=1800 (18
+predators) ≈ 55 s, below reproduction age. Food, spacing, reach and population are upstream of that limit.
