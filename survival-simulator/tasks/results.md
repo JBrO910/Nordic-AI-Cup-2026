@@ -208,3 +208,14 @@ predators) ≈ 55 s, below reproduction age. Food, spacing, reach and population
 Kill post-mortem (`scratch/deaths.py`, ripe+cap12, seeds 1–3, 188 kills): 35–45 % could not sprint when the predator was first
 seen (energy < 105), 25–30 % first detected under 60 px (heard, outside the cone), ~50 % were sitting/scanning, 30 % had
 several predators in view, ~1 % never saw it. The sprint variant targets the first two. decide 2.6 ms/tick mean, 14 ms max.
+
+### Cover and open-view facing (2026-09-18 evening), on top of sprint (96-game 1275 ± 28), 48 games each
+
+| Variant | mean survived | min | kills/run | note |
+|---|---|---|---|---|
+| view: after a scan / while sitting with no predator known, face the heading whose cone sees the most open ground (12 headings × 3 rays vs learned edges + boundary) | 1117 | 650 | 56.5 | **rejected, −158**. Mechanism moved (kills first noticed < 60 px: 26 → 18 %, never-saw-it 6 → 0) but survival fell: facing the open side faces away from the tree, so new fruit is not "watched" → loses its ripe dating → eaten young again |
+| cover: from t=600 tree score += 150 px × exposure (share of 24 rays reaching 250 px unblocked) | 1198 | 718 | 57.8 | **rejected, −77** |
+| view + cover | 1146 | 460 | 50.2 | **rejected** |
+
+Both variants also cost ray casts (decide 2.6 → 5.5 ms/tick). Lesson: the sitting heading is load-bearing for the ripe-fruit
+mechanism; any facing rule must keep the home tree inside the cone or the hearing radius.
