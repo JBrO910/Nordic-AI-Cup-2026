@@ -251,3 +251,4 @@ No `POP_CAP`; births throttled only by `RESERVE`; from t=100 s, when colony mean
 
 Lesson: with ripe-fruit waiting the early colony is rich enough to breed to 40; the release valve comes too late. The cap
 (12) is doing real work for this policy — it keeps fill at 50–65 % early so agents can sprint.
+| float: cap 12, from t=600 +1 per 50 energy of colony mean above 250 (max +6) | 1269 | 1230 | 715 | 53.7 | **rejected** −42 score / −45 survived vs sprint; inside noise but the wrong sign. Population closed. |
