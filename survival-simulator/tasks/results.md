@@ -237,3 +237,17 @@ the sprint lock (20 % of max) — a direct cause of "could not sprint" kills —
 evaluation, breed2 is the lower-variance pick at equal mean: `cp scratch/hm_breed2.py src/utils/controllers/hivemind_policy.py`
 and restart `agent_server.py` before enqueueing. Deployment: server on a VM near Hetzner Helsinki (Azure Sweden Central), plain
 `http://<ip>:9052/predict`, no tunnel — the 600 s per-game wait budget is 20 ms per tick including network.
+
+### Resource-driven population (2026-09-19, teammate's idea), on sprint, 48 games each (sprint 96-game: score 1311, survived 1275)
+
+No `POP_CAP`; births throttled only by `RESERVE`; from t=100 s, when colony mean energy < CULL_MEAN the oldest n/8 stop eating
+(sit, no claims, still flee; dump-spawn first if > 100 energy).
+
+| Variant | score | survived | min | kills/run | note |
+|---|---|---|---|---|---|
+| nocap (control, cull off) | 1195 | 1163 | 702 | 61.3 | **rejected** −112 |
+| dyn, CULL_MEAN 100 | 1218 | 1186 | 689 | 64.2 | **rejected** −90; pop 37–40 by t=100, fruit eaten down to 13–25 on the map, mean energy 16–21 % all game = at the 20 % sprint lock |
+| dyn, CULL_MEAN 200 | 1190 | 1158 | 687 | 64.1 | **rejected** −121; the cull cannot lift the mean once the population has overshot |
+
+Lesson: with ripe-fruit waiting the early colony is rich enough to breed to 40; the release valve comes too late. The cap
+(12) is doing real work for this policy — it keeps fill at 50–65 % early so agents can sprint.
