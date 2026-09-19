@@ -270,3 +270,4 @@ from tick 0. But 120 s after departure 0/4 of the party are alive in every one o
 1–5 of them eaten: **agents live 60–120 s**, so a party arrives with ~60 s to live and cannot breed there (needs > 250
 energy). The colony persists only where children are born, and that cannot be moved by walking. Biome knowledge is not
 the gap either: the colony knows 60–66 % of all cells by t=300 (78–79 % of forest/grass/swamp cells), ~90 % by t=600.
+| senescence: `OLD_AGE` 55→45, `OLD_DUMP_ENERGY` 250→180 (old agents convert to children earlier and cheaper) | 1270 | 1240 | 615 | 58.1 | **rejected** −41 score vs sprint (1311); inside noise, wrong sign. The existing ageing/dump rules already capture the idea; earlier conversion just makes more low-energy parents. |
