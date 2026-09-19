@@ -281,3 +281,11 @@ the gap either: the colony knows 60–66 % of all cells by t=300 (78–79 % of f
 | both | 1103 | 1114 | 758 | 84.2 | **rejected** −208 |
 
 The served net's raw direction is the best flee policy we have; hand-filtering it in either direction loses.
+
+## Final (2026-09-19): sprint is the evaluation policy
+
+`src/utils/controllers/hivemind_policy.py` @ HEAD = sprint (ripe-fruit waiting, disperse, cap 12 to t=1800, eat below 30 %
+energy, breed reserve 120, late scans every 1.5 s) + flee net v1 (zero-padded to OBS_DIM 20; decisions verified identical to
+`scratch/hm_sprint.py`, 0/90 741 differ). 96-game mean score 1311 ± 29, survived 1275, 33 % of games > 1450, worst 542.
+Served from a GCP `europe-north1` VM (Hamina, ~3 ms/tick) at `http://<ip>:9052/predict`; the platform's 600 s per-game
+wait budget is 20 ms/tick including network. 22 variants tested against it over 2026-09-17..19; none better.
