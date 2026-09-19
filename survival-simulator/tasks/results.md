@@ -260,3 +260,13 @@ Lesson: with ripe-fruit waiting the early colony is rich enough to breed to 40; 
 | flee net v3: + nearest map-only (unseen) predator features, 40 in-game PPO iters × 20 games from padded v1 | 1167 | 1124 | 571 | 51.7 | **rejected** −144. Greedy 24-game evals during training 1224 / 1262 / 1232 / 1172 — never above the baseline; per-episode deaths 11.6 → 10.0 % did not carry into games. The served weights stay v1 (zero-padded to OBS_DIM 20). |
 | biome: no homes/claims/exploration in desert or river, walks steered around known cells, grove weighted by fruit rate | 1203 | 1172 | **159** | 58.0 | **rejected** −108, worst game of the whole project. Kill-zone finding stands (desert 2.4×, river 2.1–2.7× kill ratio; swamp ≈ 1× since predators are slowed too), but time spent there did not move — the terrain map only knows cells agents stood on, and much of that time is flee paths. |
 | scout: from t=300 one young rich agent walks to the stalest unoccupied non-desert cell anywhere (committed mission, no claims en route), 30 s cooldown | 1180 | 1147 | 602 | 55.6 | **rejected** −131. Motivated by seed 2 (top half desert): the top-right grassland's fruit rots almost entirely (300–600 s: 93 rotted / 11 eaten) while the colony sits in the bottom half. Scouts reach the corner but no outpost forms — a lone agent in a 60 %-desert quadrant dies or drifts home, and eligible scouts run out after t≈600. A group relocation would be needed; not attempted. |
+
+### Migration / expeditions (2026-09-19 afternoon) — abandoned at the mechanism check, no gate
+
+`scratch/hm_migrate.py`: every 30 s a hungry colony (mean energy < 50 %) sends its 4 youngest fed agents (age < 40,
+energy > 150) to the best unoccupied region — known trees, or per-cell peak tree count / biome prior for unseen cells —
+walking with flee priority and no claims en route. Seed 2's rotting top-right corner *is* chosen once peaks are remembered
+from tick 0. But 120 s after departure 0/4 of the party are alive in every one of seven expeditions on seeds 1–3, only
+1–5 of them eaten: **agents live 60–120 s**, so a party arrives with ~60 s to live and cannot breed there (needs > 250
+energy). The colony persists only where children are born, and that cannot be moved by walking. Biome knowledge is not
+the gap either: the colony knows 60–66 % of all cells by t=300 (78–79 % of forest/grass/swamp cells), ~90 % by t=600.
