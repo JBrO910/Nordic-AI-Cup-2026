@@ -252,3 +252,10 @@ No `POP_CAP`; births throttled only by `RESERVE`; from t=100 s, when colony mean
 Lesson: with ripe-fruit waiting the early colony is rich enough to breed to 40; the release valve comes too late. The cap
 (12) is doing real work for this policy — it keeps fill at 50–65 % early so agents can sprint.
 | float: cap 12, from t=600 +1 per 50 energy of colony mean above 250 (max +6) | 1269 | 1230 | 715 | 53.7 | **rejected** −42 score / −45 survived vs sprint; inside noise but the wrong sign. Population closed. |
+
+### 2026-09-19: flee net v3 (map features) and biome awareness, 48 games each vs sprint (score 1311 / survived 1275)
+
+| Variant | score | survived | min | kills/run | note |
+|---|---|---|---|---|---|
+| flee net v3: + nearest map-only (unseen) predator features, 40 in-game PPO iters × 20 games from padded v1 | 1167 | 1124 | 571 | 51.7 | **rejected** −144. Greedy 24-game evals during training 1224 / 1262 / 1232 / 1172 — never above the baseline; per-episode deaths 11.6 → 10.0 % did not carry into games. The served weights stay v1 (zero-padded to OBS_DIM 20). |
+| biome: no homes/claims/exploration in desert or river, walks steered around known cells, grove weighted by fruit rate | 1203 | 1172 | **159** | 58.0 | **rejected** −108, worst game of the whole project. Kill-zone finding stands (desert 2.4×, river 2.1–2.7× kill ratio; swamp ≈ 1× since predators are slowed too), but time spent there did not move — the terrain map only knows cells agents stood on, and much of that time is flee paths. |
