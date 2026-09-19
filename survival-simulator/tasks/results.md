@@ -271,3 +271,13 @@ from tick 0. But 120 s after departure 0/4 of the party are alive in every one o
 energy). The colony persists only where children are born, and that cannot be moved by walking. Biome knowledge is not
 the gap either: the colony knows 60–66 % of all cells by t=300 (78–79 % of forest/grass/swamp cells), ~90 % by t=600.
 | senescence: `OLD_AGE` 55→45, `OLD_DUMP_ENERGY` 250→180 (old agents convert to children earlier and cheaper) | 1270 | 1240 | 615 | 58.1 | **rejected** −41 score vs sprint (1311); inside noise, wrong sign. The existing ageing/dump rules already capture the idea; earlier conversion just makes more low-energy parents. |
+
+### Flee direction variants (2026-09-19 evening), 48 games each vs sprint (score 1311, kills 59)
+
+| Variant | score | survived | min | kills/run | note |
+|---|---|---|---|---|---|
+| terrain: the net's flee direction passed through `_flee_dir` (avoid known river/swamp/desert, walls, obstacle edges) | 1174 | 1162 | 615 | 66.1 | **rejected** −137. Desert kill share halved (14 → 7 %), river 11.5 → 10 %, but total kills rose: deflecting the net's chosen side/angle breaks its evasion geometry; terrain underfoot matters less than the line it takes |
+| decoy: agents that cannot sprint or are ageing lead a visible predator away from the colony centroid, terrain-blind | 1192 | 1179 | 630 | 70.9 | **rejected** −120 |
+| both | 1103 | 1114 | 758 | 84.2 | **rejected** −208 |
+
+The served net's raw direction is the best flee policy we have; hand-filtering it in either direction loses.
