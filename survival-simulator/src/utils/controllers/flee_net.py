@@ -6,7 +6,7 @@ import numpy as np
 BIOME_PENALTY = {"swamp": 0.5, "desert": 0.8, "river": 0.3}
 N_DIR = 8
 HEADS = (3, N_DIR, 3)
-OBS_DIM = 16
+OBS_DIM = 20
 WEIGHTS = os.environ.get("FLEE_WEIGHTS", os.path.join(os.path.dirname(__file__), "flee_weights.npz"))
 
 
@@ -24,9 +24,10 @@ def nearest_edge(edges):
     return (best, math.atan2(by, bx)) if best < float("inf") else (999.0, 0.0)
 
 
-def featurize(a, pred, seen):
+def featurize(a, pred, seen, extra=()):
     """OBS_DIM floats from a real agent_status dict. `pred` = (distance, angle, rel_dir) of the closest predator,
-    or its last known values when not currently observed (`seen` False)."""
+    or its last known values when not currently observed (`seen` False). `extra` = (distance, angle) of predators the
+    shared map knows about but this agent does not see (v3 features; zero rows in older weights)."""
     d, ang, rel = pred
     ed, eang = nearest_edge([o["coords"] for o in a["observations"] if o["type"] == "Edge"])
     others = sorted(o["distance"] for o in a["observations"] if o["type"] == "Predator")[1 if seen else 0:]
@@ -35,11 +36,16 @@ def featurize(a, pred, seen):
         d2, a2, p2 = min(o2["distance"], 400) / 250, o2["angle"], 1.0
     else:
         d2, a2, p2 = 400 / 250, 0.0, 0.0
+    if extra:   # nearest map-only predator (unseen by us): the one behind us
+        d3, a3 = min(extra); p3 = 1.0
+    else:
+        d3, a3, p3 = 400.0, 0.0, 0.0
     return np.array([min(d, 400) / 250, math.cos(ang), math.sin(ang), math.cos(rel), math.sin(rel),
                      a["energy"] / a["max_energy"], float(a["energy"] > 0.2 * a["max_energy"] + 5),
                      min(ed, 200) / 100, math.cos(eang), math.sin(eang),
                      BIOME_PENALTY.get(a["biome"], 1.0), float(seen),
-                     d2, math.cos(a2) * p2, math.sin(a2) * p2, p2], dtype=np.float32)
+                     d2, math.cos(a2) * p2, math.sin(a2) * p2, p2,
+                     min(d3, 400) / 250, math.cos(a3) * p3, math.sin(a3) * p3, p3], dtype=np.float32)
 
 
 def decode(action, a, pred):
@@ -63,6 +69,6 @@ def load():
     return dict(np.load(WEIGHTS))
 
 
-def act(W, a, pred, seen):
+def act(W, a, pred, seen, extra=()):
     """(move_distance, move_direction, turn_angle) for one agent_status dict."""
-    return decode(greedy(W, featurize(a, pred, seen)), a, pred)
+    return decode(greedy(W, featurize(a, pred, seen, extra)), a, pred)

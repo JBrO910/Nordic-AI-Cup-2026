@@ -436,7 +436,7 @@ class Hivemind:
             self.last_predator_tick = self.tick
             if FLEE_NET is not None:
                 m["scan_left"], m["mode"] = 0, "flee"
-                return flee_net.act(FLEE_NET, a, (p["distance"], p["angle"], p["rel_dir"]), True)
+                return flee_net.act(FLEE_NET, a, (p["distance"], p["angle"], p["rel_dir"]), True, self._map_preds(m, preds))
             fx = fy = 0.0
             for o in preds:
                 w = 1.0 / max(o["distance"], 1.0)
@@ -454,9 +454,23 @@ class Hivemind:
             m["mode"] = "flee_mem"
             if FLEE_NET is not None:
                 dx, dy = m["pred_obs"][0] - m["x"], m["pred_obs"][1] - m["y"]
-                return flee_net.act(FLEE_NET, a, (math.hypot(dx, dy), wrap(math.atan2(dy, dx) - m["h"]), m["pred_obs"][2]), False)
+                return flee_net.act(FLEE_NET, a, (math.hypot(dx, dy), wrap(math.atan2(dy, dx) - m["h"]), m["pred_obs"][2]), False, self._map_preds(m, preds))
             return speed, self._flee_dir(m, wrap(m["pred"] + math.pi - m["h"])), 0.0
         return None
+
+    def _map_preds(self, m, preds):
+        """(distance, relative angle) of fresh map predators this agent does not see itself (for the flee net)."""
+        if m["err"] > LOC_OK:
+            return ()
+        out = []
+        for px, py, pt in self.predators:
+            if self.tick - pt > 30:
+                continue
+            d = math.hypot(px - m["x"], py - m["y"])
+            ang = wrap(math.atan2(py - m["y"], px - m["x"]) - m["h"])
+            if d < 400 and not any(abs(o["distance"] - d) < 40 and abs(wrap(o["angle"] - ang)) < 0.4 for o in preds):
+                out.append((d, ang))
+        return out
 
     def _eat(self, a, m, fruits, edges):
         """Walk to visible fruit (ignoring fruit only heard through a wall). Localized agents follow their

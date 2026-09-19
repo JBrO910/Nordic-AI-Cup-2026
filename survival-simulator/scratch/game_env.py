@@ -18,8 +18,8 @@ def play_game(W, seed, max_time=3000.0, sample=True, rng_seed=0):
     rng = np.random.default_rng(rng_seed)
     buf, called = {}, set()          # aid -> (obs, act, rew, done lists); agents whose net acted this tick
 
-    def act(W_, a, pred, seen):
-        obs = flee_net.featurize(a, pred, seen)
+    def act(W_, a, pred, seen, extra=()):
+        obs = flee_net.featurize(a, pred, seen, extra)
         action = sample_action(W_, obs, rng) if sample else flee_net.greedy(W_, obs)
         if sample:
             b = buf.setdefault(a["agent_id"], ([], [], [], []))
